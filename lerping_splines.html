@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>LERPing Splines</title>
+    <link rel="stylesheet" type="text/css" media="screen" href="basic.css">
+    <link rel="stylesheet" type="text/css" media="screen" href="jquery-ui.min.css">
+    <link rel="stylesheet" type="text/css" media="screen" href="style.css" title="app_stylesheet">
+  </head>
+  <body>
+    <header>
+      <h1>LERPing Splines</h1>
+    </header>
+
+    <pre id="debugbox" class="hidden"><span class="hdr"></span><span class="msg"></span></pre>
+
+    <div id="content" class="show_tt">
+      <div class="graph panel">
+        <div id="graph_wrapper" class="canvas_wrapper canvas_size">
+          <canvas id="graph" class="graph_canvas canvas_size" width="420" height="420">
+            This requires a browser that supports the &lt;canvas&gt; tag.
+          </canvas>
+          <canvas id="graph_ui" class="graph_canvas canvas_size" width="420" height="420">
+            This requires a browser that supports the &lt;canvas&gt; tag.
+          </canvas>
+        </div>
+      </div>
+
+      <div class="ui panel">
+        <div class="runbox buttonbox">
+          <label for="button_run">Run</label>
+          <input type="checkbox" id="button_run" name="button_run" class="tt ttright">
+        </div>
+
+        <div class="pointsbox buttonbox bbright">
+          <span class="title">Points</span>
+          <label for="num_points">
+            N =
+            <input type="number" id="num_points" value="4"
+                   min="3" max="10" step="1">
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="clear_both"></div>
+
+    <footer></footer>
+
+    <script type="text/javascript" src="jquery.min.js"></script>
+    <script type="text/javascript" src="jquery-ui.min.js"></script>
+    <script type="text/javascript" src="main.js"></script>
+  </body>
+</html>
