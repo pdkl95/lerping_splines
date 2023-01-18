@@ -17,28 +17,35 @@
     <div id="content" class="show_tt">
       <div class="graph panel">
         <div id="graph_wrapper" class="canvas_wrapper canvas_size">
-          <canvas id="graph" class="graph_canvas canvas_size" width="420" height="420">
+          <canvas id="graph" class="graph_canvas canvas_size" width="960" height="600">
             This requires a browser that supports the &lt;canvas&gt; tag.
           </canvas>
-          <canvas id="graph_ui" class="graph_canvas canvas_size" width="420" height="420">
-            This requires a browser that supports the &lt;canvas&gt; tag.
-          </canvas>
+          <!-- <canvas id="graph_ui" class="graph_canvas canvas_size" width="960" height="600"> -->
+          <!--   This requires a browser that supports the &lt;canvas&gt; tag. -->
+          <!-- </canvas> -->
         </div>
       </div>
 
       <div class="ui panel">
-        <div class="runbox buttonbox">
+        <div id="runbox" class="buttonbox">
           <label for="button_run">Run</label>
-          <input type="checkbox" id="button_run" name="button_run" class="tt ttright">
+          <input type="checkbox" id="button_run" name="button_run">
         </div>
 
-        <div class="pointsbox buttonbox bbright">
-          <span class="title">Points</span>
-          <label for="num_points">
-            N =
-            <input type="number" id="num_points" value="4"
-                   min="3" max="10" step="1">
-          </label>
+        <div class="pointsbox buttonbox">
+          <label for="num_points">Points</label>
+          <input type="text" id="num_points"
+                 value="4" data-min="3" data-max="10" data-step="1">
+        </div>
+
+        <div id="tbox" class="buttonbox">
+          <code>
+            t =
+            <span id="tvar">0</span>
+          </code>
+          <div id="tbox_slider">
+            <div id="tbox_slider_handle" class="ui-slider-handle"></div>
+          </div>
         </div>
       </div>
     </div>
