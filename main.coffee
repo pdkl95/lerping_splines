@@ -4,6 +4,9 @@ TAU = 2 * Math.PI
 
 class Point
   constructor: (x, y, @color) ->
+    @hover = false
+    @selected = false
+
     @order = 0
     @radius = 5
     @color ?= '#000'
@@ -21,6 +24,12 @@ class Point
     @ix = Math.floor(@x)
     @iy = Math.floor(@y)
 
+  contains: (x, y) ->
+    dx = @x - x
+    dy = @y - y
+    dist = Math.sqrt((dx * dx) + (dy * dy))
+    return dist <= @radius
+
   update: (t) ->
     @position.x = @x
     @position.y = @y
@@ -28,10 +37,21 @@ class Point
   draw: ->
     #console.log('draw point', @x, @y, @color)
     ctx = APP.graph_ctx
+
+    if @hover
+      ctx.beginPath()
+      ctx.fillStyle = '#ff0'
+      ctx.strokeStyle = '#000'
+      ctx.lineWidth = 1
+      ctx.arc(@x, @y, @radius * 3, 0, TAU)
+      ctx.fill()
+      ctx.stroke()
+
     ctx.beginPath()
     ctx.fillStyle = @color
-    ctx.arc(@x, @y, @radius, 0, TAU);
+    ctx.arc(@x, @y, @radius, 0, TAU)
     ctx.fill()
+
 
 class LERP extends Point
   constructor: (@from, @to) ->
@@ -129,6 +149,10 @@ class LERPingSplines
       stop:   @on_tslider_stop
 #      start:  @on_tslider_start
 
+    @context.addEventListener('mousemove', @on_mousemove)
+    @context.addEventListener('mousedown', @on_mousedown)
+    @context.addEventListener('mouseup',   @on_mouseup)
+
     console.log('init() completed!')
 
     @reset_loop()
@@ -193,6 +217,13 @@ class LERPingSplines
 
       # while @points[i].length > target
       #   @remove_lerp(i)
+
+  find_point: (x, y) ->
+    for order in @points
+      for p in order
+        if p.contains(x, y)
+          return p
+    return null
 
   add_point: (x, y) ->
     p = new Point(x, y)
@@ -266,13 +297,50 @@ class LERPingSplines
     console.log('stop()')
     @running = false
 
+  get_mouse_coord: (event) ->
+    cc = @graph_canvas.getBoundingClientRect()
+    return
+      x: event.pageX - cc.left
+      y: event.pageY - cc.top
+
+  on_mousemove: (event) =>
+    mouse = @get_mouse_coord(event)
+    for order in @points
+      for p in order
+        oldx = p.x
+        oldy = p.y
+        if p.selected
+          p.x = mouse.x
+          p.y = mouse.y
+
+        oldhover = p.hover
+        if p.contains(mouse.x, mouse.y)
+          p.hover = true
+        else
+          p.hover = false
+
+        if (p.hover != oldhover) or (p.x != oldx) or (p.y != oldy)
+          @update_and_draw()
+
+  on_mousedown: (event) =>
+    mouse = @get_mouse_coord(event)
+    p = @find_point(mouse.x, mouse.y)
+    if p?
+      p.selected = true
+
+  on_mouseup: (event) =>
+    for order in @points
+      for p in order
+        p.selected = false
+
   redraw_ui: (render_bitmap_preview = true) =>
     @graph_ui_ctx.clearRect(0, 0, @graph_ui_canvas.width, @graph_ui_canvas.height)
 
     @cur?.draw_ui()
 
-    for p in @points
-      p.draw_ui()
+    for order in @points
+      for p in order
+        p.draw_ui()
 
     return null
 

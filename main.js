@@ -11,6 +11,8 @@
   Point = (function() {
     function Point(x, y, color) {
       this.color = color;
+      this.hover = false;
+      this.selected = false;
       this.order = 0;
       this.radius = 5;
       if (this.color == null) {
@@ -30,6 +32,14 @@
       return this.iy = Math.floor(this.y);
     };
 
+    Point.prototype.contains = function(x, y) {
+      var dist, dx, dy;
+      dx = this.x - x;
+      dy = this.y - y;
+      dist = Math.sqrt((dx * dx) + (dy * dy));
+      return dist <= this.radius;
+    };
+
     Point.prototype.update = function(t) {
       this.position.x = this.x;
       return this.position.y = this.y;
@@ -38,6 +48,15 @@
     Point.prototype.draw = function() {
       var ctx;
       ctx = APP.graph_ctx;
+      if (this.hover) {
+        ctx.beginPath();
+        ctx.fillStyle = '#ff0';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1;
+        ctx.arc(this.x, this.y, this.radius * 3, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+      }
       ctx.beginPath();
       ctx.fillStyle = this.color;
       ctx.arc(this.x, this.y, this.radius, 0, TAU);
@@ -103,6 +122,9 @@
       this.update_callback = bind(this.update_callback, this);
       this.update = bind(this.update, this);
       this.redraw_ui = bind(this.redraw_ui, this);
+      this.on_mouseup = bind(this.on_mouseup, this);
+      this.on_mousedown = bind(this.on_mousedown, this);
+      this.on_mousemove = bind(this.on_mousemove, this);
       this.stop = bind(this.stop, this);
       this.start = bind(this.start, this);
       this.on_tslider_stop = bind(this.on_tslider_stop, this);
@@ -157,6 +179,9 @@
         slide: this.on_tslider_slide,
         stop: this.on_tslider_stop
       });
+      this.context.addEventListener('mousemove', this.on_mousemove);
+      this.context.addEventListener('mousedown', this.on_mousedown);
+      this.context.addEventListener('mouseup', this.on_mouseup);
       console.log('init() completed!');
       this.reset_loop();
       this.add_initial_points();
@@ -241,6 +266,21 @@
         }).call(this));
       }
       return results;
+    };
+
+    LERPingSplines.prototype.find_point = function(x, y) {
+      var j, k, len, len1, order, p, ref;
+      ref = this.points;
+      for (j = 0, len = ref.length; j < len; j++) {
+        order = ref[j];
+        for (k = 0, len1 = order.length; k < len1; k++) {
+          p = order[k];
+          if (p.contains(x, y)) {
+            return p;
+          }
+        }
+      }
+      return null;
     };
 
     LERPingSplines.prototype.add_point = function(x, y) {
@@ -342,8 +382,81 @@
       return this.running = false;
     };
 
+    LERPingSplines.prototype.get_mouse_coord = function(event) {
+      var cc;
+      cc = this.graph_canvas.getBoundingClientRect();
+      return {
+        x: event.pageX - cc.left,
+        y: event.pageY - cc.top
+      };
+    };
+
+    LERPingSplines.prototype.on_mousemove = function(event) {
+      var j, len, mouse, oldhover, oldx, oldy, order, p, ref, results;
+      mouse = this.get_mouse_coord(event);
+      ref = this.points;
+      results = [];
+      for (j = 0, len = ref.length; j < len; j++) {
+        order = ref[j];
+        results.push((function() {
+          var k, len1, results1;
+          results1 = [];
+          for (k = 0, len1 = order.length; k < len1; k++) {
+            p = order[k];
+            oldx = p.x;
+            oldy = p.y;
+            if (p.selected) {
+              p.x = mouse.x;
+              p.y = mouse.y;
+            }
+            oldhover = p.hover;
+            if (p.contains(mouse.x, mouse.y)) {
+              p.hover = true;
+            } else {
+              p.hover = false;
+            }
+            if ((p.hover !== oldhover) || (p.x !== oldx) || (p.y !== oldy)) {
+              results1.push(this.update_and_draw());
+            } else {
+              results1.push(void 0);
+            }
+          }
+          return results1;
+        }).call(this));
+      }
+      return results;
+    };
+
+    LERPingSplines.prototype.on_mousedown = function(event) {
+      var mouse, p;
+      mouse = this.get_mouse_coord(event);
+      p = this.find_point(mouse.x, mouse.y);
+      if (p != null) {
+        return p.selected = true;
+      }
+    };
+
+    LERPingSplines.prototype.on_mouseup = function(event) {
+      var j, len, order, p, ref, results;
+      ref = this.points;
+      results = [];
+      for (j = 0, len = ref.length; j < len; j++) {
+        order = ref[j];
+        results.push((function() {
+          var k, len1, results1;
+          results1 = [];
+          for (k = 0, len1 = order.length; k < len1; k++) {
+            p = order[k];
+            results1.push(p.selected = false);
+          }
+          return results1;
+        })());
+      }
+      return results;
+    };
+
     LERPingSplines.prototype.redraw_ui = function(render_bitmap_preview) {
-      var j, len, p, ref, ref1;
+      var j, k, len, len1, order, p, ref, ref1;
       if (render_bitmap_preview == null) {
         render_bitmap_preview = true;
       }
@@ -353,8 +466,11 @@
       }
       ref1 = this.points;
       for (j = 0, len = ref1.length; j < len; j++) {
-        p = ref1[j];
-        p.draw_ui();
+        order = ref1[j];
+        for (k = 0, len1 = order.length; k < len1; k++) {
+          p = order[k];
+          p.draw_ui();
+        }
       }
       return null;
     };
