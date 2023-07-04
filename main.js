@@ -337,13 +337,11 @@
 
     LERPingSplines.prototype.on_tslide_btn_min_click = function() {
       this.set_t(0.0);
-      this.tslider.slider("option", "value", 0.0);
       return this.update_and_draw();
     };
 
     LERPingSplines.prototype.on_tslide_btn_max_click = function() {
       this.set_t(1.0);
-      this.tslider.slider("option", "value", 1.0);
       return this.update_and_draw();
     };
 
@@ -364,7 +362,8 @@
       while (this.t > 1.0) {
         this.t -= 1.0;
       }
-      return this.tvar.text(this.t.toFixed(2));
+      this.tvar.text(this.t.toFixed(2));
+      return this.tslider.slider("option", "value", this.t);
     };
 
     LERPingSplines.prototype.start = function() {

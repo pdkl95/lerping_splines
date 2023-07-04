@@ -261,12 +261,10 @@ class LERPingSplines
 
   on_tslide_btn_min_click: =>
     @set_t(0.0)
-    @tslider.slider("option", "value", 0.0);
     @update_and_draw()
 
   on_tslide_btn_max_click: =>
     @set_t(1.0)
-    @tslider.slider("option", "value", 1.0)
     @update_and_draw()
 
   on_tslider_start: =>
@@ -283,7 +281,8 @@ class LERPingSplines
   set_t: (value) ->
     @t = value
     @t -= 1.0 while @t > 1.0
-    @tvar.text(@t.toFixed(2))    
+    @tvar.text(@t.toFixed(2))
+    @tslider.slider("option", "value", @t)
 
   start: =>
     console.log('start()')
