@@ -12,8 +12,6 @@
       <h1>LERPing Splines</h1>
     </header>
 
-    <pre id="debugbox" class="hidden"><span class="hdr"></span><span class="msg"></span></pre>
-
     <div id="content" class="show_tt">
       <div class="graph panel">
         <div id="graph_wrapper" class="canvas_wrapper canvas_size">
@@ -34,8 +32,9 @@
 
         <div class="pointsbox buttonbox">
           <label for="num_points">Points</label>
-          <input type="text" id="num_points"
-                 value="4" data-min="3" data-max="10" data-step="1">
+          <button id="remove_point">-</button>
+          <span id="num_points">4</span>
+          <button id="add_point">-</button>
         </div>
 
         <div id="tbox" class="buttonbox">
@@ -48,6 +47,8 @@
         </div>
       </div>
     </div>
+
+    <div id="debugbox" class="hidden clear_both"></div>
 
     <div class="clear_both"></div>
 

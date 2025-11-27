@@ -97,6 +97,11 @@ class LERP extends Point
 
 
 class LERPingSplines
+  @min_points: 2
+  @max_points: 6
+
+  @create_point_margin: 0.12
+
   constructor: (@context) ->
 
   init: () ->
@@ -117,14 +122,22 @@ class LERPingSplines
     @graph_height = @graph_canvas.height
 
     @points = []
-    @set_max_lerp_order(3)
+    @set_max_lerp_order(LERPingSplines.max_points - 1)
 
     @btn_run = $('#button_run').checkboxradio(icon: false)
     @btn_run.change(@on_btn_run_change)
 
-    @num_points = $('#num_points').spinner
-       change: @on_num_points_changed
-       stop:   @on_num_points_changed
+    @num_points = $('#num_points')
+
+    @add_point_btn = $('#add_point').button
+      icon: 'ui-icon-plusthick'
+      showLabel: false
+    @add_point_btn.click(@on_add_point_btn_click)
+
+    @remove_point_btn = $('#remove_point').button
+      icon: 'ui-icon-minusthick'
+      showLabel: false
+    @remove_point_btn.click(@on_remove_point_btn_click)
 
     @tvar = $('#tvar')
 
@@ -159,16 +172,34 @@ class LERPingSplines
     @add_initial_points()
     @update()
 
-  debug: (msg) ->
+    @update_points()
+
+
+  debug: (msg_text) ->
     unless @debugbox?
       @debugbox = $('#debugbox')
-      @debugbox_hdr = @debugbox.find('.hdr')
-      @debugbox_msg = @debugbox.find('.msg')
       @debugbox.removeClass('hidden')
 
+    hdr = $('<span/>',  class: 'hdr')
+    msg = $('<span/>',  class: 'msg')
+
     timestamp = new Date()
-    @debugbox_hdr.text(timestamp.toISOString())
-    @debugbox_msg.text('' + msg)
+    hdr.text(timestamp.toISOString())
+    msg.text('' + msg_text)
+
+    line = $('<div/>', class: "dbg_line").append([ hdr, msg ])
+    @debugbox.append(line)
+
+    @debugbox.animate({ scrollTop: @debugbox.prop("scrollHeight")}, 600);
+
+  print_lerps: ->
+    for order in [0..@points.length]
+      console.log("@points[#{order}]")
+      if @points[order]?
+        for x in @points[order]
+          console.log(@points[order])
+      else
+        console.log("@points[#{order}] = null")
 
   set_max_lerp_order: (n) ->
     @max_lerp_order = n
@@ -186,12 +217,13 @@ class LERPingSplines
     @loop_running = false
 
   add_initial_points: ->
-    @add_point( 0.88 * @graph_width, 0.90 * @graph_height )
-    @add_point( 0.72 * @graph_width, 0.18 * @graph_height )
-    @add_point( 0.15 * @graph_width, 0.08 * @graph_height )
-    @add_point( 0.06 * @graph_width, 0.85 * @graph_height )
+    @add_point( 0.88, 0.90 )
+    @add_point( 0.72, 0.18 )
+    @add_point( 0.15, 0.08 )
+    @add_point( 0.06, 0.85 )
 
     console.log('Initial points created!')
+    @print_lerps()
 
   add_lerp: (from, to) ->
     lerp = new LERP(from, to)
@@ -215,8 +247,8 @@ class LERPingSplines
         unless plen < 2
           @add_lerp( prev[plen - 2], prev[plen - 1] )
 
-      # while @points[i].length > target
-      #   @remove_lerp(i)
+      #while @points[i].length > target
+      #  @remove_lerp(i)
 
   find_point: (x, y) ->
     for order in @points
@@ -225,23 +257,48 @@ class LERPingSplines
           return p
     return null
 
+  update_points: ->
+    if @points[0].length < LERPingSplines.max_points
+      @add_point_btn.button("enable")
+    else
+      @add_point_btn.button("disable")
+
+    if @points[0].length > LERPingSplines.min_points
+      @remove_point_btn.button("enable")
+    else
+      @remove_point_btn.button("disable")
+
+    @num_points.text("#{@points[0].length}")
+
   add_point: (x, y) ->
-    p = new Point(x, y)
+    console.log('add_point', { x: x, y: y })
+    p = new Point(x * @graph_width, y * @graph_height )
     @points[0].push( p )
     @fix_num_lerps()
+    @update_points()
+
+  create_point: ->
+    margin = LERPingSplines.create_point_margin
+    range = 1.0 - (2.0 * margin)
+    console.log('margin', margin, 'range', range)
+    x = margin + (range * Math.random())
+    y = margin + (range * Math.random())
+    @add_point(x, y)
 
   remove_point: ->
     @remove_lerp(0)
     @fix_num_lerps()
+    @update_points()
 
-  set_num_points: (target_num) -> 
-    @add_point()    while @points.length < target_num
-    @remove_point() while @points.length > target_num
- 
-  on_num_points_changed: (event, ui) =>
-    msg = '[num_points] event: ' + event.type + ', value = ' + @num_points.val()
-    #console.log(msg)
-    @debug msg
+  on_add_point_btn_click: (event, ui) =>
+    console.log("CLICK: add_point", event);
+    @create_point()
+    @print_lerps()
+
+  on_remove_point_btn_click: (event, ui) =>
+    console.log("CLICK: remove_point", event);
+    @remove_point()
+    @print_lerps()
 
   on_btn_run_change: (event, ui) =>
     checked = @btn_run.is(':checked')
