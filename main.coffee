@@ -2,6 +2,24 @@ APP = null
 
 TAU = 2 * Math.PI
 
+class Vec2
+  @lerp: (a, b, amount) ->
+    return
+      x: a.x + (amount * (b.x - a.x))
+      y: a.y + (amount * (b.y - a.y))
+
+  @scale: (v, scale) ->
+    return
+      x: v.x * scale
+      y: v.y * scale
+
+  @rotate: (v, angle) ->
+    c = Math.cos(angle)
+    s = Math.sin(angle)
+    return
+      x: (v.x * c) - (v.y * s)
+      y: (v.x * s) + (v.y * c)
+
 class Point
   constructor: (x, y, @color) ->
     @enabled = false
@@ -31,9 +49,6 @@ class Point
     dy = @y - y
     dist = Math.sqrt((dx * dx) + (dy * dy))
     return dist <= @radius
-
-  value: (t) ->
-    return [@position.x, @position.y]
 
   update: (t) ->
     @position.x = @x
@@ -66,24 +81,29 @@ class LERP extends Point
 
     @radius = 5
 
-    color_fract = @order / (APP.max_lerp_order + 2)
-    color_fract *= 255
-    @color = "rgb(#{color_fract},#{color_fract},#{color_fract})"
-    #console.log("lerp<#{@order}> color", @color)
+    @color = switch @order
+      when 1 then '#000'
+      when 2 then '#2D42DC'
+      when 3 then '#A243DC'
+      when 4 then '#D44143'
+      when 5 then '#D98F46'
+      when 6 then '#70D942'
+      when 7 then '#6E55FF'
+      else '#555'
+
+    #@color = "rgb(#{color_fract},#{color_fract},#{color_fract})"
+    console.log("lerp<#{@order}> color", @color)
 
     @position =
       x: @from.x
       y: @from.y
 
+    @prev_position =
+      x: null
+      y: null
+
   interpolate: (t, a, b) ->
     (t * a) + ((1 - t) * b)
-
-  value: (t) ->
-    from_value = @from.value()
-    to_value   = @to.value()
-    x = @interpolate(t, from_value[0], to_value[0])
-    y = @interpolate(t, from_value[1], to_value[1])
-    return [ x, y ]
 
   update: (t) ->
     @enabled = @from.enabled and @to.enabled
@@ -117,7 +137,10 @@ class LERP extends Point
 
 class LERPingSplines
   @min_points: 2
-  @max_points: 6
+  @max_points: 8
+
+  @max_lerp_order: ->
+    LERPingSplines.max_points - 1
 
   @create_point_margin: 0.12
 
@@ -210,7 +233,7 @@ class LERPingSplines
 
   reset_loop: ->
     @t = 0
-    @t_step = 0.01
+    @t_step = 0.002
 
   loop_start: ->
     @loop_running = true
@@ -266,6 +289,8 @@ class LERPingSplines
       @remove_point_btn.button("disable")
 
     @num_points.text("#{@enabled_points}")
+
+    @update()
 
   enable_point: ->
     return if @enabled_points >= LERPingSplines.max_points
@@ -405,27 +430,7 @@ class LERPingSplines
   update: =>
     @update_at(@t)
 
-  # draw_bezier: ->
-  #   if @points[0].length <= 4
-  #     a   = @points[0][0]
-  #     cp1 = @points[0][1]
-  #     cp2 = @points[0][2]
-  #     b   = @points[0][3]
-
-  #     ctx = @graph_ctx
-  #     ctx.beginPath()
-  #     ctx.strokeStyle = '#EC4444'
-  #     ctx.lineWidth = 3
-  #     ctx.moveTo(a.position.x, a.position.y)
-  #     ctx.bezierCurveTo(cp1.position.x, cp1.position.y, cp2.position.x, cp2.position.y, b.position.x, b.position.y)
-  #     ctx.stroke()
-
   draw_bezier: ->
-    ctx = @graph_ctx
-    ctx.beginPath()
-    ctx.strokeStyle = '#EC4444'
-    ctx.lineWidth = 3
-
     start = @points[0][0]
 
     p = null
@@ -433,6 +438,11 @@ class LERPingSplines
       p = @points[i][0]
       if p?.enabled
         break
+
+    ctx = @graph_ctx
+    ctx.beginPath()
+    ctx.strokeStyle = p.color
+    ctx.lineWidth = 3
 
     t = 0.0
     @update_at(t)
@@ -443,18 +453,60 @@ class LERPingSplines
       ctx.lineTo(p.position.x, p.position.y)
 
     ctx.stroke()
-    ctx.strokeStyle = '#000'
+    #ctx.strokeStyle = '#000'
+
+    @pen = p
 
   draw: ->
     for order in @points
       for p in order
-        p.draw()
+        if p.order > 1
+          p.draw()
+    for p in @points[1]
+      p.draw()
+    for p in @points[0]
+      p.draw()
+
+  draw_pen: ->
+    return unless @pen?
+    if @pen.prev_position.x? and @pen.prev_position.y?
+      normal =
+        x: -(@pen.position.y - @pen.prev_position.y)
+        y:  (@pen.position.x - @pen.prev_position.x)
+
+      arrow    = Vec2.scale(normal, 8.0)
+      arrowtip = Vec2.scale(normal, 7.0)
+      normal   = Vec2.scale(normal, 30.0)
+
+      angle = TAU / 8.0
+      arrow1 = Vec2.rotate(arrow, angle)
+      arrow2 = Vec2.rotate(arrow, -angle)
+
+      arrowtip.x += @pen.position.x
+      arrowtip.y += @pen.position.y
+
+      ctx = @graph_ctx
+      ctx.beginPath()
+      ctx.moveTo(arrowtip.x, arrowtip.y)
+      ctx.lineTo(arrowtip.x + normal.x, arrowtip.y + normal.y)
+      ctx.moveTo(arrowtip.x, arrowtip.y)
+      ctx.lineTo(arrowtip.x + arrow1.x, arrowtip.y + arrow1.y)
+      ctx.moveTo(arrowtip.x, arrowtip.y)
+      ctx.lineTo(arrowtip.x + arrow2.x, arrowtip.y + arrow2.y)
+      ctx.strokeStyle = '#000000'
+      ctx.lineWidth = 2
+      ctx.lineCap = "round"
+      ctx.stroke()
+
+    @pen.prev_position.x = @pen.position.x
+    @pen.prev_position.y = @pen.position.y
 
   update_and_draw: ->
     @graph_ctx.clearRect(0, 0, @graph_canvas.width, @graph_canvas.height)
     @draw_bezier()
     @update()
     @draw()
+    @draw_pen()
 
   update_callback: (timestamp) =>
     @frame_is_scheduled = false

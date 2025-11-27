@@ -1,5 +1,5 @@
 (function() {
-  var APP, LERP, LERPingSplines, Point, TAU,
+  var APP, LERP, LERPingSplines, Point, TAU, Vec2,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
@@ -7,6 +7,37 @@
   APP = null;
 
   TAU = 2 * Math.PI;
+
+  Vec2 = (function() {
+    function Vec2() {}
+
+    Vec2.lerp = function(a, b, amount) {
+      return {
+        x: a.x + (amount * (b.x - a.x)),
+        y: a.y + (amount * (b.y - a.y))
+      };
+    };
+
+    Vec2.scale = function(v, scale) {
+      return {
+        x: v.x * scale,
+        y: v.y * scale
+      };
+    };
+
+    Vec2.rotate = function(v, angle) {
+      var c, s;
+      c = Math.cos(angle);
+      s = Math.sin(angle);
+      return {
+        x: (v.x * c) - (v.y * s),
+        y: (v.x * s) + (v.y * c)
+      };
+    };
+
+    return Vec2;
+
+  })();
 
   Point = (function() {
     function Point(x, y, color) {
@@ -39,10 +70,6 @@
       dy = this.y - y;
       dist = Math.sqrt((dx * dx) + (dy * dy));
       return dist <= this.radius;
-    };
-
-    Point.prototype.value = function(t) {
-      return [this.position.x, this.position.y];
     };
 
     Point.prototype.update = function(t) {
@@ -79,32 +106,44 @@
     extend(LERP, superClass);
 
     function LERP(order1, from, to) {
-      var color_fract;
       this.order = order1;
       this.from = from;
       this.to = to;
       this.enabled = false;
       this.radius = 5;
-      color_fract = this.order / (APP.max_lerp_order + 2);
-      color_fract *= 255;
-      this.color = "rgb(" + color_fract + "," + color_fract + "," + color_fract + ")";
+      this.color = (function() {
+        switch (this.order) {
+          case 1:
+            return '#000';
+          case 2:
+            return '#2D42DC';
+          case 3:
+            return '#A243DC';
+          case 4:
+            return '#D44143';
+          case 5:
+            return '#D98F46';
+          case 6:
+            return '#70D942';
+          case 7:
+            return '#6E55FF';
+          default:
+            return '#555';
+        }
+      }).call(this);
+      console.log("lerp<" + this.order + "> color", this.color);
       this.position = {
         x: this.from.x,
         y: this.from.y
+      };
+      this.prev_position = {
+        x: null,
+        y: null
       };
     }
 
     LERP.prototype.interpolate = function(t, a, b) {
       return (t * a) + ((1 - t) * b);
-    };
-
-    LERP.prototype.value = function(t) {
-      var from_value, to_value, x, y;
-      from_value = this.from.value();
-      to_value = this.to.value();
-      x = this.interpolate(t, from_value[0], to_value[0]);
-      y = this.interpolate(t, from_value[1], to_value[1]);
-      return [x, y];
     };
 
     LERP.prototype.update = function(t) {
@@ -138,7 +177,11 @@
   LERPingSplines = (function() {
     LERPingSplines.min_points = 2;
 
-    LERPingSplines.max_points = 6;
+    LERPingSplines.max_points = 8;
+
+    LERPingSplines.max_lerp_order = function() {
+      return LERPingSplines.max_points - 1;
+    };
 
     LERPingSplines.create_point_margin = 0.12;
 
@@ -251,7 +294,7 @@
 
     LERPingSplines.prototype.reset_loop = function() {
       this.t = 0;
-      return this.t_step = 0.01;
+      return this.t_step = 0.002;
     };
 
     LERPingSplines.prototype.loop_start = function() {
@@ -312,7 +355,8 @@
       } else {
         this.remove_point_btn.button("disable");
       }
-      return this.num_points.text("" + this.enabled_points);
+      this.num_points.text("" + this.enabled_points);
+      return this.update();
     };
 
     LERPingSplines.prototype.enable_point = function() {
@@ -543,10 +587,6 @@
 
     LERPingSplines.prototype.draw_bezier = function() {
       var ctx, i, k, p, ref, start, t;
-      ctx = this.graph_ctx;
-      ctx.beginPath();
-      ctx.strokeStyle = '#EC4444';
-      ctx.lineWidth = 3;
       start = this.points[0][0];
       p = null;
       for (i = k = ref = LERPingSplines.max_points - 1; ref <= 1 ? k <= 1 : k >= 1; i = ref <= 1 ? ++k : --k) {
@@ -555,6 +595,10 @@
           break;
         }
       }
+      ctx = this.graph_ctx;
+      ctx.beginPath();
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 3;
       t = 0.0;
       this.update_at(t);
       ctx.moveTo(p.position.x, p.position.y);
@@ -564,33 +608,76 @@
         ctx.lineTo(p.position.x, p.position.y);
       }
       ctx.stroke();
-      return ctx.strokeStyle = '#000';
+      return this.pen = p;
     };
 
     LERPingSplines.prototype.draw = function() {
-      var k, len, order, p, ref, results;
+      var k, l, len, len1, len2, len3, m, n, order, p, ref, ref1, ref2, results;
       ref = this.points;
-      results = [];
       for (k = 0, len = ref.length; k < len; k++) {
         order = ref[k];
-        results.push((function() {
-          var l, len1, results1;
-          results1 = [];
-          for (l = 0, len1 = order.length; l < len1; l++) {
-            p = order[l];
-            results1.push(p.draw());
+        for (l = 0, len1 = order.length; l < len1; l++) {
+          p = order[l];
+          if (p.order > 1) {
+            p.draw();
           }
-          return results1;
-        })());
+        }
+      }
+      ref1 = this.points[1];
+      for (m = 0, len2 = ref1.length; m < len2; m++) {
+        p = ref1[m];
+        p.draw();
+      }
+      ref2 = this.points[0];
+      results = [];
+      for (n = 0, len3 = ref2.length; n < len3; n++) {
+        p = ref2[n];
+        results.push(p.draw());
       }
       return results;
+    };
+
+    LERPingSplines.prototype.draw_pen = function() {
+      var angle, arrow, arrow1, arrow2, arrowtip, ctx, normal;
+      if (this.pen == null) {
+        return;
+      }
+      if ((this.pen.prev_position.x != null) && (this.pen.prev_position.y != null)) {
+        normal = {
+          x: -(this.pen.position.y - this.pen.prev_position.y),
+          y: this.pen.position.x - this.pen.prev_position.x
+        };
+        arrow = Vec2.scale(normal, 8.0);
+        arrowtip = Vec2.scale(normal, 7.0);
+        normal = Vec2.scale(normal, 30.0);
+        angle = TAU / 8.0;
+        arrow1 = Vec2.rotate(arrow, angle);
+        arrow2 = Vec2.rotate(arrow, -angle);
+        arrowtip.x += this.pen.position.x;
+        arrowtip.y += this.pen.position.y;
+        ctx = this.graph_ctx;
+        ctx.beginPath();
+        ctx.moveTo(arrowtip.x, arrowtip.y);
+        ctx.lineTo(arrowtip.x + normal.x, arrowtip.y + normal.y);
+        ctx.moveTo(arrowtip.x, arrowtip.y);
+        ctx.lineTo(arrowtip.x + arrow1.x, arrowtip.y + arrow1.y);
+        ctx.moveTo(arrowtip.x, arrowtip.y);
+        ctx.lineTo(arrowtip.x + arrow2.x, arrowtip.y + arrow2.y);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.lineCap = "round";
+        ctx.stroke();
+      }
+      this.pen.prev_position.x = this.pen.position.x;
+      return this.pen.prev_position.y = this.pen.position.y;
     };
 
     LERPingSplines.prototype.update_and_draw = function() {
       this.graph_ctx.clearRect(0, 0, this.graph_canvas.width, this.graph_canvas.height);
       this.draw_bezier();
       this.update();
-      return this.draw();
+      this.draw();
+      return this.draw_pen();
     };
 
     LERPingSplines.prototype.update_callback = function(timestamp) {
