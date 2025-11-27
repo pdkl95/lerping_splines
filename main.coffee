@@ -4,6 +4,8 @@ TAU = 2 * Math.PI
 
 class Point
   constructor: (x, y, @color) ->
+    @enabled = false
+
     @hover = false
     @selected = false
 
@@ -30,11 +32,16 @@ class Point
     dist = Math.sqrt((dx * dx) + (dy * dy))
     return dist <= @radius
 
+  value: (t) ->
+    return [@position.x, @position.y]
+
   update: (t) ->
     @position.x = @x
     @position.y = @y
 
   draw: ->
+    return unless @enabled
+
     #console.log('draw point', @x, @y, @color)
     ctx = APP.graph_ctx
 
@@ -54,8 +61,8 @@ class Point
 
 
 class LERP extends Point
-  constructor: (@from, @to) ->
-    @order = @from.order + 1
+  constructor: (@order, @from, @to) ->
+    @enabled = false
 
     @radius = 5
 
@@ -71,7 +78,17 @@ class LERP extends Point
   interpolate: (t, a, b) ->
     (t * a) + ((1 - t) * b)
 
-  update: (t) -> 
+  value: (t) ->
+    from_value = @from.value()
+    to_value   = @to.value()
+    x = @interpolate(t, from_value[0], to_value[0])
+    y = @interpolate(t, from_value[1], to_value[1])
+    return [ x, y ]
+
+  update: (t) ->
+    @enabled = @from.enabled and @to.enabled
+    #return unless @enabled
+
     #console.log("update lerp<#{@order}> t=#{t}")
     @position.x = @interpolate(t, @from.position.x, @to.position.x)
     @position.y = @interpolate(t, @from.position.y, @to.position.y)
@@ -80,6 +97,8 @@ class LERP extends Point
     #console.log("position = [#{@position.x},#{@position.y}]")
 
   draw: ->
+    return unless @enabled
+
     #console.log("draw lerp<#{@order}> at [#{@position.x},#{@position.y}]")
     ctx = APP.graph_ctx
 
@@ -122,7 +141,7 @@ class LERPingSplines
     @graph_height = @graph_canvas.height
 
     @points = []
-    @set_max_lerp_order(LERPingSplines.max_points - 1)
+    @enabled_points = 0
 
     @btn_run = $('#button_run').checkboxradio(icon: false)
     @btn_run.change(@on_btn_run_change)
@@ -172,9 +191,6 @@ class LERPingSplines
     @add_initial_points()
     @update()
 
-    @update_points()
-
-
   debug: (msg_text) ->
     unless @debugbox?
       @debugbox = $('#debugbox')
@@ -192,20 +208,6 @@ class LERPingSplines
 
     @debugbox.animate({ scrollTop: @debugbox.prop("scrollHeight")}, 600);
 
-  print_lerps: ->
-    for order in [0..@points.length]
-      console.log("@points[#{order}]")
-      if @points[order]?
-        for x in @points[order]
-          console.log(@points[order])
-      else
-        console.log("@points[#{order}] = null")
-
-  set_max_lerp_order: (n) ->
-    @max_lerp_order = n
-    for i in [0..n]
-      @points[i] ||= []
-
   reset_loop: ->
     @t = 0
     @t_step = 0.01
@@ -217,88 +219,83 @@ class LERPingSplines
     @loop_running = false
 
   add_initial_points: ->
-    @add_point( 0.88, 0.90 )
-    @add_point( 0.72, 0.18 )
-    @add_point( 0.15, 0.08 )
-    @add_point( 0.06, 0.85 )
+    margin = LERPingSplines.create_point_margin
+    range = 1.0 - (2.0 * margin)
+
+    @points[0] = []
+    for i in [0..LERPingSplines.max_points]
+      x = margin + (range * Math.random())
+      y = margin + (range * Math.random())
+      @points[0][i] = new Point(x * @graph_width, y * @graph_height)
+
+    for order in [1..LERPingSplines.max_points]
+      @points[order] = []
+      prev_order = order - 1
+      prev = @points[prev_order]
+      #console.log(prev)
+      for j in [0..(LERPingSplines.max_points - order)]
+        #console.log("LERP[#{order}] = (#{j}, #{j+1})")
+        lerp = new LERP( order, prev[j], prev[j+1] )
+        @points[order][j] = lerp
+
+    @enable_point_at( 0.88, 0.90 )
+    @enable_point_at( 0.72, 0.18 )
+    @enable_point_at( 0.15, 0.08 )
+    @enable_point_at( 0.06, 0.85 )
+
+    @update_enabled_points()
 
     console.log('Initial points created!')
-    @print_lerps()
-
-  add_lerp: (from, to) ->
-    lerp = new LERP(from, to)
-    @points[lerp.order].push(lerp)
-
-  remove_lerp: (order) ->
-    #lerp =
-    @points[order].pop()
-    #lerp.destroy()
-
-  fix_num_lerps: ->
-    for i in [1..@max_lerp_order]
-      pi = i - 1
-      prev = @points[pi]
-      plen = prev.length
-      target = plen - 1
-
-      while @points[i].length < target
-        prev = @points[pi]
-        plen = prev.length
-        unless plen < 2
-          @add_lerp( prev[plen - 2], prev[plen - 1] )
-
-      #while @points[i].length > target
-      #  @remove_lerp(i)
+    #console.log(@points)
 
   find_point: (x, y) ->
-    for order in @points
-      for p in order
-        if p.contains(x, y)
-          return p
+    for p in @points[0]
+      if p?.contains(x, y)
+        return p    
     return null
 
-  update_points: ->
-    if @points[0].length < LERPingSplines.max_points
+  update_enabled_points: ->
+    if @enabled_points < LERPingSplines.max_points
       @add_point_btn.button("enable")
     else
       @add_point_btn.button("disable")
 
-    if @points[0].length > LERPingSplines.min_points
+    if @enabled_points > LERPingSplines.min_points
       @remove_point_btn.button("enable")
     else
       @remove_point_btn.button("disable")
 
-    @num_points.text("#{@points[0].length}")
+    @num_points.text("#{@enabled_points}")
 
-  add_point: (x, y) ->
-    console.log('add_point', { x: x, y: y })
-    p = new Point(x * @graph_width, y * @graph_height )
-    @points[0].push( p )
-    @fix_num_lerps()
-    @update_points()
+  enable_point: ->
+    return if @enabled_points >= LERPingSplines.max_points
+    p = @points[0][@enabled_points]
+    @enabled_points += 1
+    p.enabled = true
+    @update_enabled_points()
+    p
 
-  create_point: ->
-    margin = LERPingSplines.create_point_margin
-    range = 1.0 - (2.0 * margin)
-    console.log('margin', margin, 'range', range)
-    x = margin + (range * Math.random())
-    y = margin + (range * Math.random())
-    @add_point(x, y)
+  enable_point_at: (x, y) ->
+    p = @enable_point()
+    p.x = x * @graph_width
+    p.y = y * @graph_height
+    p
 
-  remove_point: ->
-    @remove_lerp(0)
-    @fix_num_lerps()
-    @update_points()
+  disable_point: ->
+    return if @enabled_points <= LERPingSplines.min_points
+    @enabled_points -= 1
+    p = @points[0][@enabled_points]
+    p.enabled = false
+    @update_enabled_points()
+    p
 
   on_add_point_btn_click: (event, ui) =>
-    console.log("CLICK: add_point", event);
-    @create_point()
-    @print_lerps()
+    @enable_point()
+    @update_and_draw()
 
   on_remove_point_btn_click: (event, ui) =>
-    console.log("CLICK: remove_point", event);
-    @remove_point()
-    @print_lerps()
+    @disable_point()
+    @update_and_draw()
 
   on_btn_run_change: (event, ui) =>
     checked = @btn_run.is(':checked')
@@ -400,34 +397,62 @@ class LERPingSplines
 
     return null
 
-  update: =>
+  update_at: (t) =>
     for order in @points
       for p in order
-        p.update(@t)
+        p.update(t)
+
+  update: =>
+    @update_at(@t)
+
+  # draw_bezier: ->
+  #   if @points[0].length <= 4
+  #     a   = @points[0][0]
+  #     cp1 = @points[0][1]
+  #     cp2 = @points[0][2]
+  #     b   = @points[0][3]
+
+  #     ctx = @graph_ctx
+  #     ctx.beginPath()
+  #     ctx.strokeStyle = '#EC4444'
+  #     ctx.lineWidth = 3
+  #     ctx.moveTo(a.position.x, a.position.y)
+  #     ctx.bezierCurveTo(cp1.position.x, cp1.position.y, cp2.position.x, cp2.position.y, b.position.x, b.position.y)
+  #     ctx.stroke()
 
   draw_bezier: ->
-    if @points[0].length <= 4
-      a   = @points[0][0]
-      cp1 = @points[0][1]
-      cp2 = @points[0][2]
-      b   = @points[0][3]
+    ctx = @graph_ctx
+    ctx.beginPath()
+    ctx.strokeStyle = '#EC4444'
+    ctx.lineWidth = 3
 
-      ctx = @graph_ctx
-      ctx.beginPath()
-      ctx.strokeStyle = '#EC4444'
-      ctx.lineWidth = 3
-      ctx.moveTo(a.position.x, a.position.y)
-      ctx.bezierCurveTo(cp1.position.x, cp1.position.y, cp2.position.x, cp2.position.y, b.position.x, b.position.y)
-      ctx.stroke()
+    start = @points[0][0]
+
+    p = null
+    for i in [(LERPingSplines.max_points - 1)..1]
+      p = @points[i][0]
+      if p?.enabled
+        break
+
+    t = 0.0
+    @update_at(t)
+    ctx.moveTo(p.position.x, p.position.y)
+    while t < 1.0
+      t += 0.02
+      @update_at(t)
+      ctx.lineTo(p.position.x, p.position.y)
+
+    ctx.stroke()
+    ctx.strokeStyle = '#000'
 
   draw: ->
-    @graph_ctx.clearRect(0, 0, @graph_canvas.width, @graph_canvas.height)
-    @draw_bezier()
     for order in @points
       for p in order
         p.draw()
 
   update_and_draw: ->
+    @graph_ctx.clearRect(0, 0, @graph_canvas.width, @graph_canvas.height)
+    @draw_bezier()
     @update()
     @draw()
 
@@ -437,8 +462,7 @@ class LERPingSplines
     if elapsed > 0
       @prev_anim_timestamp = @anim_timestamp
       @set_t( @t + @t_step )
-      @update()
-      @draw()
+      @update_and_draw()
 
     @schedule_next_frame() if @running
     return null
