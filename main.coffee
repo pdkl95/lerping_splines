@@ -20,6 +20,21 @@ class Vec2
       x: (v.x * c) - (v.y * s)
       y: (v.x * s) + (v.y * c)
 
+  @normalize: (v) ->
+    result =
+      x: 0.0
+      y: 0.0
+
+    length = Math.sqrt((v.x*v.x) + (v.y*v.y))
+
+    if length > 0
+      ilength = 1.0 / length;
+      result.x = v.x * ilength
+      result.y = v.y * ilength
+
+    result
+
+
 class Point
   constructor: (x, y, @color) ->
     @enabled = false
@@ -166,6 +181,8 @@ class LERPingSplines
     @points = []
     @enabled_points = 0
 
+    @reset_loop()
+
     @btn_run = $('#button_run').checkboxradio(icon: false)
     @btn_run.change(@on_btn_run_change)
 
@@ -210,7 +227,6 @@ class LERPingSplines
 
     console.log('init() completed!')
 
-    @reset_loop()
     @add_initial_points()
     @update()
 
@@ -255,9 +271,7 @@ class LERPingSplines
       @points[order] = []
       prev_order = order - 1
       prev = @points[prev_order]
-      #console.log(prev)
       for j in [0..(LERPingSplines.max_points - order)]
-        #console.log("LERP[#{order}] = (#{j}, #{j+1})")
         lerp = new LERP( order, prev[j], prev[j+1] )
         @points[order][j] = lerp
 
@@ -269,7 +283,6 @@ class LERPingSplines
     @update_enabled_points()
 
     console.log('Initial points created!')
-    #console.log(@points)
 
   find_point: (x, y) ->
     for p in @points[0]
@@ -453,7 +466,6 @@ class LERPingSplines
       ctx.lineTo(p.position.x, p.position.y)
 
     ctx.stroke()
-    #ctx.strokeStyle = '#000'
 
     @pen = p
 
@@ -469,14 +481,22 @@ class LERPingSplines
 
   draw_pen: ->
     return unless @pen?
+
+    @update_at(@t - @t_step)
+    @pen.prev_position.x = @pen.position.x
+    @pen.prev_position.y = @pen.position.y
+    @update()
+
     if @pen.prev_position.x? and @pen.prev_position.y?
       normal =
         x: -(@pen.position.y - @pen.prev_position.y)
         y:  (@pen.position.x - @pen.prev_position.x)
 
-      arrow    = Vec2.scale(normal, 8.0)
-      arrowtip = Vec2.scale(normal, 7.0)
-      normal   = Vec2.scale(normal, 30.0)
+      normal = Vec2.normalize(normal)
+
+      arrow    = Vec2.scale(normal, 22.0)
+      arrowtip = Vec2.scale(normal, 15.0)
+      normal   = Vec2.scale(normal, 65.0)
 
       angle = TAU / 8.0
       arrow1 = Vec2.rotate(arrow, angle)
@@ -497,9 +517,6 @@ class LERPingSplines
       ctx.lineWidth = 2
       ctx.lineCap = "round"
       ctx.stroke()
-
-    @pen.prev_position.x = @pen.position.x
-    @pen.prev_position.y = @pen.position.y
 
   update_and_draw: ->
     @graph_ctx.clearRect(0, 0, @graph_canvas.width, @graph_canvas.height)

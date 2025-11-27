@@ -35,6 +35,21 @@
       };
     };
 
+    Vec2.normalize = function(v) {
+      var ilength, length, result;
+      result = {
+        x: 0.0,
+        y: 0.0
+      };
+      length = Math.sqrt((v.x * v.x) + (v.y * v.y));
+      if (length > 0) {
+        ilength = 1.0 / length;
+        result.x = v.x * ilength;
+        result.y = v.y * ilength;
+      }
+      return result;
+    };
+
     return Vec2;
 
   })();
@@ -223,6 +238,7 @@
       this.graph_height = this.graph_canvas.height;
       this.points = [];
       this.enabled_points = 0;
+      this.reset_loop();
       this.btn_run = $('#button_run').checkboxradio({
         icon: false
       });
@@ -263,7 +279,6 @@
       this.context.addEventListener('mousedown', this.on_mousedown);
       this.context.addEventListener('mouseup', this.on_mouseup);
       console.log('init() completed!');
-      this.reset_loop();
       this.add_initial_points();
       return this.update();
     };
@@ -642,14 +657,19 @@
       if (this.pen == null) {
         return;
       }
+      this.update_at(this.t - this.t_step);
+      this.pen.prev_position.x = this.pen.position.x;
+      this.pen.prev_position.y = this.pen.position.y;
+      this.update();
       if ((this.pen.prev_position.x != null) && (this.pen.prev_position.y != null)) {
         normal = {
           x: -(this.pen.position.y - this.pen.prev_position.y),
           y: this.pen.position.x - this.pen.prev_position.x
         };
-        arrow = Vec2.scale(normal, 8.0);
-        arrowtip = Vec2.scale(normal, 7.0);
-        normal = Vec2.scale(normal, 30.0);
+        normal = Vec2.normalize(normal);
+        arrow = Vec2.scale(normal, 22.0);
+        arrowtip = Vec2.scale(normal, 15.0);
+        normal = Vec2.scale(normal, 65.0);
         angle = TAU / 8.0;
         arrow1 = Vec2.rotate(arrow, angle);
         arrow2 = Vec2.rotate(arrow, -angle);
@@ -666,10 +686,8 @@
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 2;
         ctx.lineCap = "round";
-        ctx.stroke();
+        return ctx.stroke();
       }
-      this.pen.prev_position.x = this.pen.position.x;
-      return this.pen.prev_position.y = this.pen.position.y;
     };
 
     LERPingSplines.prototype.update_and_draw = function() {
