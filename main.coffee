@@ -130,7 +130,7 @@ class LERP extends Point
       else '#555'
 
     #@color = "rgb(#{color_fract},#{color_fract},#{color_fract})"
-    console.log("lerp<#{@order}> color", @color)
+    #console.log("lerp<#{@order}> color", @color)
 
     @position =
       x: @from.x
@@ -232,45 +232,34 @@ class LERPingSplines
 
     @reset_loop()
 
-    @btn_play_pause = $('#button_play_pause').button
-      icon: 'ui-icon-play'
-      showLabel: false
-    @btn_play_pause.click(@on_btn_play_pause_click)
+    @btn_play_pause = @context.getElementById('button_play_pause')
+    console.log(@btn_play_pause)
+    @btn_play_pause.addEventListener('click',@on_btn_play_pause_click)
 
-    @num_points = $('#num_points')
+    @num_points = @context.getElementById('num_points')
 
-    @add_point_btn = $('#add_point').button
-      icon: 'ui-icon-plus'
-      showLabel: false
-    @add_point_btn.click(@on_add_point_btn_click)
+    @add_point_btn = @context.getElementById('add_point')
+    @add_point_btn?.addEventListener('click', @on_add_point_btn_click)
 
-    @remove_point_btn = $('#remove_point').button
-      icon: 'ui-icon-minus'
-      showLabel: false
-    @remove_point_btn.click(@on_remove_point_btn_click)
+    @remove_point_btn = @context.getElementById('remove_point')
+    @remove_point_btn?.addEventListener('click', @on_remove_point_btn_click)
 
-    @tvar = $('#tvar')
+    @tvar = @context.getElementById('tvar')
 
-    @tslider_btn_min = $('#tbox_slider_btn_min').button
-      showLabel: false
-      icon:      'ui-icon-arrowthickstop-1-w'
-      click:     @on_tslide_btn_min_click 
-    @tslider_btn_min.click(@on_tslide_btn_min_click)
+    @tslider_btn_min = @context.getElementById('tbox_slider_btn_min')
+    @tslider_btn_min.addEventListener('click', @on_tslide_btn_min_click)
 
-    @tslider_btn_max = $('#tbox_slider_btn_max').button
-      showLabel: false
-      icon:      'ui-icon-arrowthickstop-1-e'
-    @tslider_btn_max.click(@on_tslide_btn_max_click)
+    @tslider_btn_max = @context.getElementById('tbox_slider_btn_max')
+    @tslider_btn_max.addEventListener('click', @on_tslide_btn_max_click)
 
     @tslider_saved_running_status = @running
-    @tslider = $('#tbox_slider').slider
-      min:   0.0
-      max:   1.0
-      step:  0.01
-      change: @on_tslider_change
-      slide:  @on_tslider_slide
-      stop:   @on_tslider_stop
-#      start:  @on_tslider_start
+    @tslider = @context.getElementById('tbox_slider')
+      # min:   0.0
+      # max:   1.0
+      # step:  0.01
+      # change: @on_tslider_change
+      # slide:  @on_tslider_slide
+      # stop:   @on_tslider_stop
 
     @context.addEventListener('mousemove', @on_mousemove)
     @context.addEventListener('mousedown', @on_mousedown)
@@ -280,10 +269,11 @@ class LERPingSplines
 
     @add_initial_points()
     @update()
+    @stop()
 
   debug: (msg_text) ->
     unless @debugbox?
-      @debugbox = $('#debugbox')
+      @debugbox = @context.getElementById('debugbox')
       @debugbox.removeClass('hidden')
 
     hdr = $('<span/>',  class: 'hdr')
@@ -344,16 +334,16 @@ class LERPingSplines
 
   update_enabled_points: ->
     if @enabled_points < LERPingSplines.max_points
-      @add_point_btn.button("enable")
+      @add_point_btn.disabled = false
     else
-      @add_point_btn.button("disable")
+      @add_point_btn.disabled = true
 
     if @enabled_points > LERPingSplines.min_points
-      @remove_point_btn.button("enable")
+      @remove_point_btn.disabled = false
     else
-      @remove_point_btn.button("disable")
+      @remove_point_btn.disabled = true
 
-    @num_points.text("#{@enabled_points}")
+    @num_points.textContent = "#{@enabled_points}"
 
     @update()
 
@@ -424,23 +414,20 @@ class LERPingSplines
   set_t: (value) ->
     @t = value
     @t -= 1.0 while @t > 1.0
-    @tvar.text(@t.toFixed(2))
-    @tslider.slider("option", "value", @t)
+    @tvar.textContent = (@t.toFixed(2))
+    #@tslider.slider("option", "value", @t)
 
   start: =>
     if @running
       # do nothing
     else
       @running = true
-      @btn_play_pause.button("option", "icon", "ui-icon-pause")
+      @btn_play_pause.innerHTML = "&#x23F8;"
       @schedule_first_frame()
 
   stop: =>
-    if @running
-      @running = false
-      @btn_play_pause.button("option", "icon", "ui-icon-play")
-    else
-      # do nothing
+    @running = false
+    @btn_play_pause.innerHTML = "&#x23F5;"
 
   clamp_to_canvas: (v) ->
     v.x = @point_move_margin.min_x if v.x < @point_move_margin.min_x
@@ -615,7 +602,7 @@ class LERPingSplines
     window.requestAnimationFrame(@first_update_callback)
     return null
 
-$(document).ready =>
+document.addEventListener 'DOMContentLoaded', =>
   APP = new LERPingSplines(document)
   APP.init()
   APP.draw()

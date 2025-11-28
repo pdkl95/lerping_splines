@@ -4,7 +4,6 @@
     <meta charset="utf-8">
     <title>LERPing Splines</title>
     <link rel="stylesheet" type="text/css" media="screen" href="basic.css">
-    <link rel="stylesheet" type="text/css" media="screen" href="jquery-ui.min.css">
     <link rel="stylesheet" type="text/css" media="screen" href="style.css" title="app_stylesheet">
   </head>
   <body>
@@ -38,11 +37,8 @@
           <div id="tbox_slider_btn_max"></div>
         </div>
 
-        <div class="pointsbox buttonbox bbright ui-widget-hrader">
-          <label for="num_points">Points:</label>
-          <button id="remove_point">-</button>
-          <div id="num_points" class="">4</div>
-          <button id="add_point">+</button>
+        <div class="pointsbox buttonbox bbright">
+          <div id="points_wrapper"><div id="points_label">Points</div><button id="remove_point" class="btn">&#x2796;</button><div id="num_points">4</div><button id="add_point" class="btn">&#x2795;</button></div>
         </div>
       </div>
     </div>
@@ -53,8 +49,6 @@
 
     <footer></footer>
 
-    <script type="text/javascript" src="jquery.min.js"></script>
-    <script type="text/javascript" src="jquery-ui.min.js"></script>
     <script type="text/javascript" src="main.js"></script>
   </body>
 </html>

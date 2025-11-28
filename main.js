@@ -171,7 +171,6 @@
             return '#555';
         }
       }).call(this);
-      console.log("lerp<" + this.order + "> color", this.color);
       this.position = {
         x: this.from.x,
         y: this.from.y
@@ -272,6 +271,7 @@
     }
 
     LERPingSplines.prototype.init = function() {
+      var ref, ref1;
       console.log('Starting init()...');
       this.running = false;
       this.content_el = this.context.getElementById('content');
@@ -292,55 +292,38 @@
       this.points = [];
       this.enabled_points = 0;
       this.reset_loop();
-      this.btn_play_pause = $('#button_play_pause').button({
-        icon: 'ui-icon-play',
-        showLabel: false
-      });
-      this.btn_play_pause.click(this.on_btn_play_pause_click);
-      this.num_points = $('#num_points');
-      this.add_point_btn = $('#add_point').button({
-        icon: 'ui-icon-plus',
-        showLabel: false
-      });
-      this.add_point_btn.click(this.on_add_point_btn_click);
-      this.remove_point_btn = $('#remove_point').button({
-        icon: 'ui-icon-minus',
-        showLabel: false
-      });
-      this.remove_point_btn.click(this.on_remove_point_btn_click);
-      this.tvar = $('#tvar');
-      this.tslider_btn_min = $('#tbox_slider_btn_min').button({
-        showLabel: false,
-        icon: 'ui-icon-arrowthickstop-1-w',
-        click: this.on_tslide_btn_min_click
-      });
-      this.tslider_btn_min.click(this.on_tslide_btn_min_click);
-      this.tslider_btn_max = $('#tbox_slider_btn_max').button({
-        showLabel: false,
-        icon: 'ui-icon-arrowthickstop-1-e'
-      });
-      this.tslider_btn_max.click(this.on_tslide_btn_max_click);
+      this.btn_play_pause = this.context.getElementById('button_play_pause');
+      console.log(this.btn_play_pause);
+      this.btn_play_pause.addEventListener('click', this.on_btn_play_pause_click);
+      this.num_points = this.context.getElementById('num_points');
+      this.add_point_btn = this.context.getElementById('add_point');
+      if ((ref = this.add_point_btn) != null) {
+        ref.addEventListener('click', this.on_add_point_btn_click);
+      }
+      this.remove_point_btn = this.context.getElementById('remove_point');
+      if ((ref1 = this.remove_point_btn) != null) {
+        ref1.addEventListener('click', this.on_remove_point_btn_click);
+      }
+      this.tvar = this.context.getElementById('tvar');
+      this.tslider_btn_min = this.context.getElementById('tbox_slider_btn_min');
+      this.tslider_btn_min.addEventListener('click', this.on_tslide_btn_min_click);
+      this.tslider_btn_max = this.context.getElementById('tbox_slider_btn_max');
+      this.tslider_btn_max.addEventListener('click', this.on_tslide_btn_max_click);
       this.tslider_saved_running_status = this.running;
-      this.tslider = $('#tbox_slider').slider({
-        min: 0.0,
-        max: 1.0,
-        step: 0.01,
-        change: this.on_tslider_change,
-        slide: this.on_tslider_slide,
-        stop: this.on_tslider_stop
-      });
+      this.tslider = this.context.getElementById('tbox_slider');
       this.context.addEventListener('mousemove', this.on_mousemove);
       this.context.addEventListener('mousedown', this.on_mousedown);
       this.context.addEventListener('mouseup', this.on_mouseup);
       console.log('init() completed!');
       this.add_initial_points();
-      return this.update();
+      this.update();
+      return this.stop();
     };
 
     LERPingSplines.prototype.debug = function(msg_text) {
       var hdr, line, msg, timestamp;
       if (this.debugbox == null) {
-        this.debugbox = $('#debugbox');
+        this.debugbox = this.context.getElementById('debugbox');
         this.debugbox.removeClass('hidden');
       }
       hdr = $('<span/>', {
@@ -416,16 +399,16 @@
 
     LERPingSplines.prototype.update_enabled_points = function() {
       if (this.enabled_points < LERPingSplines.max_points) {
-        this.add_point_btn.button("enable");
+        this.add_point_btn.disabled = false;
       } else {
-        this.add_point_btn.button("disable");
+        this.add_point_btn.disabled = true;
       }
       if (this.enabled_points > LERPingSplines.min_points) {
-        this.remove_point_btn.button("enable");
+        this.remove_point_btn.disabled = false;
       } else {
-        this.remove_point_btn.button("disable");
+        this.remove_point_btn.disabled = true;
       }
-      this.num_points.text("" + this.enabled_points);
+      this.num_points.textContent = "" + this.enabled_points;
       return this.update();
     };
 
@@ -518,8 +501,7 @@
       while (this.t > 1.0) {
         this.t -= 1.0;
       }
-      this.tvar.text(this.t.toFixed(2));
-      return this.tslider.slider("option", "value", this.t);
+      return this.tvar.textContent = this.t.toFixed(2);
     };
 
     LERPingSplines.prototype.start = function() {
@@ -527,18 +509,14 @@
 
       } else {
         this.running = true;
-        this.btn_play_pause.button("option", "icon", "ui-icon-pause");
+        this.btn_play_pause.innerHTML = "&#x23F8;";
         return this.schedule_first_frame();
       }
     };
 
     LERPingSplines.prototype.stop = function() {
-      if (this.running) {
-        this.running = false;
-        return this.btn_play_pause.button("option", "icon", "ui-icon-play");
-      } else {
-
-      }
+      this.running = false;
+      return this.btn_play_pause.innerHTML = "&#x23F5;";
     };
 
     LERPingSplines.prototype.clamp_to_canvas = function(v) {
@@ -812,7 +790,7 @@
 
   })();
 
-  $(document).ready((function(_this) {
+  document.addEventListener('DOMContentLoaded', (function(_this) {
     return function() {
       APP = new LERPingSplines(document);
       APP.init();
