@@ -61,7 +61,7 @@
       this.hover = false;
       this.selected = false;
       this.order = 0;
-      this.radius = 5;
+      this.radius = LERPingSplines.point_radius;
       if (this.color == null) {
         this.color = '#000';
       }
@@ -69,8 +69,19 @@
         x: x,
         y: y
       };
+      this.label_position = {
+        x: x,
+        y: y
+      };
       this.move(x, y);
     }
+
+    Point.prototype.set_label = function(label) {
+      this.label = label;
+      this.label_metrics = APP.graph_ctx.measureText(this.label);
+      this.label_width = this.label_metrics.width;
+      return this.label_height = LERPingSplines.point_label_height;
+    };
 
     Point.prototype.move = function(x, y) {
       this.x = x;
@@ -84,12 +95,22 @@
       dx = this.x - x;
       dy = this.y - y;
       dist = Math.sqrt((dx * dx) + (dy * dy));
-      return dist <= this.radius;
+      return dist <= this.radius + LERPingSplines.mouseover_point_radius_boost;
     };
 
     Point.prototype.update = function(t) {
       this.position.x = this.x;
-      return this.position.y = this.y;
+      this.position.y = this.y;
+      if (this.position.x < (APP.graph_width / 2.0)) {
+        this.label_position.x = this.position.x - this.label_width - 13;
+      } else {
+        this.label_position.x = this.position.x + this.label_width - 1;
+      }
+      if (this.position.y < (APP.graph_height / 2.0)) {
+        return this.label_position.y = this.position.y - this.label_height + 2;
+      } else {
+        return this.label_position.y = this.position.y + this.label_height + 8;
+      }
     };
 
     Point.prototype.draw = function() {
@@ -110,7 +131,11 @@
       ctx.beginPath();
       ctx.fillStyle = this.color;
       ctx.arc(this.x, this.y, this.radius, 0, TAU);
-      return ctx.fill();
+      ctx.fill();
+      if (this.label) {
+        ctx.fillStyle = '#000';
+        return ctx.fillText(this.label, this.label_position.x, this.label_position.y);
+      }
     };
 
     return Point;
@@ -158,7 +183,7 @@
     }
 
     LERP.prototype.interpolate = function(t, a, b) {
-      return (t * a) + ((1 - t) * b);
+      return (t * b) + ((1 - t) * a);
     };
 
     LERP.prototype.update = function(t) {
@@ -180,9 +205,20 @@
       ctx.lineTo(this.to.position.x, this.to.position.y);
       ctx.stroke();
       ctx.beginPath();
-      ctx.lineWidth = 3;
-      ctx.arc(this.position.x, this.position.y, this.radius + 1, 0, TAU);
-      return ctx.stroke();
+      if (APP.pen === this) {
+        ctx.arc(this.position.x, this.position.y, this.radius + 3, 0, TAU);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.globalOpacity = 0.4;
+        ctx.stroke();
+        return ctx.globalOpacity = 1.0;
+      } else {
+        ctx.lineWidth = 3;
+        ctx.arc(this.position.x, this.position.y, this.radius + 1, 0, TAU);
+        return ctx.stroke();
+      }
     };
 
     return LERP;
@@ -199,6 +235,16 @@
     };
 
     LERPingSplines.create_point_margin = 0.12;
+
+    LERPingSplines.point_radius = 5;
+
+    LERPingSplines.point_move_margin = 3;
+
+    LERPingSplines.point_labels = "ABCDEFGHIJKLM";
+
+    LERPingSplines.point_label_height = 22;
+
+    LERPingSplines.mouseover_point_radius_boost = 6;
 
     function LERPingSplines(context) {
       this.context = context;
@@ -220,7 +266,7 @@
       this.on_tslide_btn_min_click = bind(this.on_tslide_btn_min_click, this);
       this.on_tslider_changer = bind(this.on_tslider_changer, this);
       this.on_tslider_slide = bind(this.on_tslider_slide, this);
-      this.on_btn_run_change = bind(this.on_btn_run_change, this);
+      this.on_btn_play_pause_click = bind(this.on_btn_play_pause_click, this);
       this.on_remove_point_btn_click = bind(this.on_remove_point_btn_click, this);
       this.on_add_point_btn_click = bind(this.on_add_point_btn_click, this);
     }
@@ -234,23 +280,31 @@
       this.graph_ctx = this.graph_canvas.getContext('2d', {
         alpha: true
       });
+      this.graph_ctx.font = "bold " + LERPingSplines.point_label_height + "px sans-serif";
       this.graph_width = this.graph_canvas.width;
       this.graph_height = this.graph_canvas.height;
+      this.point_move_margin = {
+        min_x: LERPingSplines.point_move_margin,
+        min_y: LERPingSplines.point_move_margin,
+        max_x: this.graph_width - LERPingSplines.point_move_margin,
+        max_y: this.graph_height - LERPingSplines.point_move_margin
+      };
       this.points = [];
       this.enabled_points = 0;
       this.reset_loop();
-      this.btn_run = $('#button_run').checkboxradio({
-        icon: false
+      this.btn_play_pause = $('#button_play_pause').button({
+        icon: 'ui-icon-play',
+        showLabel: false
       });
-      this.btn_run.change(this.on_btn_run_change);
+      this.btn_play_pause.click(this.on_btn_play_pause_click);
       this.num_points = $('#num_points');
       this.add_point_btn = $('#add_point').button({
-        icon: 'ui-icon-plusthick',
+        icon: 'ui-icon-plus',
         showLabel: false
       });
       this.add_point_btn.click(this.on_add_point_btn_click);
       this.remove_point_btn = $('#remove_point').button({
-        icon: 'ui-icon-minusthick',
+        icon: 'ui-icon-minus',
         showLabel: false
       });
       this.remove_point_btn.click(this.on_remove_point_btn_click);
@@ -329,6 +383,7 @@
         x = margin + (range * Math.random());
         y = margin + (range * Math.random());
         this.points[0][i] = new Point(x * this.graph_width, y * this.graph_height);
+        this.points[0][i].set_label(LERPingSplines.point_labels[i]);
       }
       for (order = l = 1, ref1 = LERPingSplines.max_points; 1 <= ref1 ? l <= ref1 : l >= ref1; order = 1 <= ref1 ? ++l : --l) {
         this.points[order] = [];
@@ -339,10 +394,10 @@
           this.points[order][j] = lerp;
         }
       }
-      this.enable_point_at(0.88, 0.90);
-      this.enable_point_at(0.72, 0.18);
-      this.enable_point_at(0.15, 0.08);
       this.enable_point_at(0.06, 0.85);
+      this.enable_point_at(0.15, 0.08);
+      this.enable_point_at(0.72, 0.18);
+      this.enable_point_at(0.88, 0.90);
       this.update_enabled_points();
       return console.log('Initial points created!');
     };
@@ -416,13 +471,11 @@
       return this.update_and_draw();
     };
 
-    LERPingSplines.prototype.on_btn_run_change = function(event, ui) {
-      var checked;
-      checked = this.btn_run.is(':checked');
-      if (checked) {
-        return this.start();
-      } else {
+    LERPingSplines.prototype.on_btn_play_pause_click = function(event, ui) {
+      if (this.running) {
         return this.stop();
+      } else {
+        return this.start();
       }
     };
 
@@ -470,27 +523,48 @@
     };
 
     LERPingSplines.prototype.start = function() {
-      console.log('start()');
       if (this.running) {
 
       } else {
         this.running = true;
+        this.btn_play_pause.button("option", "icon", "ui-icon-pause");
         return this.schedule_first_frame();
       }
     };
 
     LERPingSplines.prototype.stop = function() {
-      console.log('stop()');
-      return this.running = false;
+      if (this.running) {
+        this.running = false;
+        return this.btn_play_pause.button("option", "icon", "ui-icon-play");
+      } else {
+
+      }
+    };
+
+    LERPingSplines.prototype.clamp_to_canvas = function(v) {
+      if (v.x < this.point_move_margin.min_x) {
+        v.x = this.point_move_margin.min_x;
+      }
+      if (v.y < this.point_move_margin.min_y) {
+        v.y = this.point_move_margin.min_y;
+      }
+      if (v.x > this.point_move_margin.max_x) {
+        v.x = this.point_move_margin.max_x;
+      }
+      if (v.y > this.point_move_margin.max_y) {
+        v.y = this.point_move_margin.max_y;
+      }
+      return v;
     };
 
     LERPingSplines.prototype.get_mouse_coord = function(event) {
-      var cc;
+      var cc, coord;
       cc = this.graph_canvas.getBoundingClientRect();
-      return {
+      coord = {
         x: event.pageX - cc.left,
         y: event.pageY - cc.top
       };
+      return this.clamp_to_canvas(coord);
     };
 
     LERPingSplines.prototype.on_mousemove = function(event) {

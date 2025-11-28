@@ -9,7 +9,7 @@
   </head>
   <body>
     <header>
-      <h1>LERPing Splines</h1>
+      <h1 class="canvas_width">LERPing Splines</h1>
     </header>
 
     <div id="content" class="show_tt">
@@ -24,17 +24,9 @@
         </div>
       </div>
 
-      <div class="ui panel">
+      <div class="ui panel canvas_width">
         <div id="runbox" class="buttonbox">
-          <label for="button_run">Run</label>
-          <input type="checkbox" id="button_run" name="button_run">
-        </div>
-
-        <div class="pointsbox buttonbox">
-          <label for="num_points">Points</label>
-          <button id="remove_point">-</button>
-          <span id="num_points">4</span>
-          <button id="add_point">-</button>
+          <button id="button_play_pause" name="button_play_pause">Play</button>
         </div>
 
         <div id="tbox" class="buttonbox">
@@ -44,6 +36,13 @@
           <div id="tbox_slider_btn_min"></div>
           <div id="tbox_slider"></div>
           <div id="tbox_slider_btn_max"></div>
+        </div>
+
+        <div class="pointsbox buttonbox bbright ui-widget-hrader">
+          <label for="num_points">Points:</label>
+          <button id="remove_point">-</button>
+          <div id="num_points" class="">4</div>
+          <button id="add_point">+</button>
         </div>
       </div>
     </div>

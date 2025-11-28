@@ -43,14 +43,23 @@ class Point
     @selected = false
 
     @order = 0
-    @radius = 5
+    @radius = LERPingSplines.point_radius
     @color ?= '#000'
 
     @position =
       x: x
       y: y
 
+    @label_position =
+      x: x
+      y: y
+
     @move x, y
+
+  set_label: (@label) ->
+    @label_metrics = APP.graph_ctx.measureText(@label)
+    @label_width   = @label_metrics.width
+    @label_height  = LERPingSplines.point_label_height
 
   move: (x, y) ->
     @x = x
@@ -63,11 +72,21 @@ class Point
     dx = @x - x
     dy = @y - y
     dist = Math.sqrt((dx * dx) + (dy * dy))
-    return dist <= @radius
+    return dist <= @radius + LERPingSplines.mouseover_point_radius_boost
 
   update: (t) ->
     @position.x = @x
     @position.y = @y
+
+    if @position.x < (APP.graph_width / 2.0)
+      @label_position.x = @position.x - @label_width - 13
+    else
+      @label_position.x = @position.x + @label_width - 1
+
+    if @position.y < (APP.graph_height / 2.0)
+      @label_position.y = @position.y - @label_height + 2
+    else
+      @label_position.y = @position.y + @label_height + 8
 
   draw: ->
     return unless @enabled
@@ -88,6 +107,10 @@ class Point
     ctx.fillStyle = @color
     ctx.arc(@x, @y, @radius, 0, TAU)
     ctx.fill()
+
+    if @label
+      ctx.fillStyle = '#000'
+      ctx.fillText(@label, @label_position.x, @label_position.y);
 
 
 class LERP extends Point
@@ -118,7 +141,7 @@ class LERP extends Point
       y: null
 
   interpolate: (t, a, b) ->
-    (t * a) + ((1 - t) * b)
+    (t * b) + ((1 - t) * a)
 
   update: (t) ->
     @enabled = @from.enabled and @to.enabled
@@ -145,9 +168,19 @@ class LERP extends Point
     ctx.stroke()
 
     ctx.beginPath()
-    ctx.lineWidth = 3
-    ctx.arc(@position.x, @position.y, @radius + 1, 0, TAU);
-    ctx.stroke()
+    if APP.pen is this
+      ctx.arc(@position.x, @position.y, @radius + 3, 0, TAU);
+      ctx.fillStyle = @color
+      ctx.fill()
+      ctx.strokeStyle = '#000'
+      ctx.lineWidth = 2
+      ctx.globalOpacity = 0.4
+      ctx.stroke()
+      ctx.globalOpacity = 1.0
+    else
+      ctx.lineWidth = 3
+      ctx.arc(@position.x, @position.y, @radius + 1, 0, TAU);
+      ctx.stroke()
 
 
 class LERPingSplines
@@ -158,6 +191,14 @@ class LERPingSplines
     LERPingSplines.max_points - 1
 
   @create_point_margin: 0.12
+
+  @point_radius: 5
+  @point_move_margin: 3
+
+  @point_labels: "ABCDEFGHIJKLM"
+  @point_label_height: 22
+
+  @mouseover_point_radius_boost: 6
 
   constructor: (@context) ->
 
@@ -175,26 +216,36 @@ class LERPingSplines
     @graph_ctx    = @graph_canvas.getContext('2d', alpha: true)
     #graph_ui_ctx = @graph_ui_canvas.getContext('2d', alpha: true)
 
+    @graph_ctx.font = "bold #{LERPingSplines.point_label_height}px sans-serif"
+
     @graph_width  = @graph_canvas.width
     @graph_height = @graph_canvas.height
+
+    @point_move_margin =
+      min_x: LERPingSplines.point_move_margin
+      min_y: LERPingSplines.point_move_margin
+      max_x: @graph_width  - LERPingSplines.point_move_margin
+      max_y: @graph_height - LERPingSplines.point_move_margin
 
     @points = []
     @enabled_points = 0
 
     @reset_loop()
 
-    @btn_run = $('#button_run').checkboxradio(icon: false)
-    @btn_run.change(@on_btn_run_change)
+    @btn_play_pause = $('#button_play_pause').button
+      icon: 'ui-icon-play'
+      showLabel: false
+    @btn_play_pause.click(@on_btn_play_pause_click)
 
     @num_points = $('#num_points')
 
     @add_point_btn = $('#add_point').button
-      icon: 'ui-icon-plusthick'
+      icon: 'ui-icon-plus'
       showLabel: false
     @add_point_btn.click(@on_add_point_btn_click)
 
     @remove_point_btn = $('#remove_point').button
-      icon: 'ui-icon-minusthick'
+      icon: 'ui-icon-minus'
       showLabel: false
     @remove_point_btn.click(@on_remove_point_btn_click)
 
@@ -266,6 +317,7 @@ class LERPingSplines
       x = margin + (range * Math.random())
       y = margin + (range * Math.random())
       @points[0][i] = new Point(x * @graph_width, y * @graph_height)
+      @points[0][i].set_label( LERPingSplines.point_labels[i] )
 
     for order in [1..LERPingSplines.max_points]
       @points[order] = []
@@ -275,10 +327,10 @@ class LERPingSplines
         lerp = new LERP( order, prev[j], prev[j+1] )
         @points[order][j] = lerp
 
-    @enable_point_at( 0.88, 0.90 )
-    @enable_point_at( 0.72, 0.18 )
-    @enable_point_at( 0.15, 0.08 )
     @enable_point_at( 0.06, 0.85 )
+    @enable_point_at( 0.15, 0.08 )
+    @enable_point_at( 0.72, 0.18 )
+    @enable_point_at( 0.88, 0.90 )
 
     @update_enabled_points()
 
@@ -335,12 +387,11 @@ class LERPingSplines
     @disable_point()
     @update_and_draw()
 
-  on_btn_run_change: (event, ui) =>
-    checked = @btn_run.is(':checked')
-    if checked
-      @start()
-    else
+  on_btn_play_pause_click: (event, ui) =>
+    if @running
       @stop()
+    else
+      @start()
 
   on_tslider_slide: (event, ui) =>
     v = @tslider.slider("option", "value");
@@ -377,22 +428,33 @@ class LERPingSplines
     @tslider.slider("option", "value", @t)
 
   start: =>
-    console.log('start()')
     if @running
       # do nothing
     else
       @running = true
+      @btn_play_pause.button("option", "icon", "ui-icon-pause")
       @schedule_first_frame()
 
   stop: =>
-    console.log('stop()')
-    @running = false
+    if @running
+      @running = false
+      @btn_play_pause.button("option", "icon", "ui-icon-play")
+    else
+      # do nothing
+
+  clamp_to_canvas: (v) ->
+    v.x = @point_move_margin.min_x if v.x < @point_move_margin.min_x
+    v.y = @point_move_margin.min_y if v.y < @point_move_margin.min_y
+    v.x = @point_move_margin.max_x if v.x > @point_move_margin.max_x
+    v.y = @point_move_margin.max_y if v.y > @point_move_margin.max_y
+    v
 
   get_mouse_coord: (event) ->
     cc = @graph_canvas.getBoundingClientRect()
-    return
+    coord =
       x: event.pageX - cc.left
       y: event.pageY - cc.top
+    @clamp_to_canvas(coord)
 
   on_mousemove: (event) =>
     mouse = @get_mouse_coord(event)

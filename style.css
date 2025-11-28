@@ -71,6 +71,10 @@ h1 {
   left: 0;
 }
 
+.canvas_width {
+  width: 970px;
+}
+
 .canvas_size {
   width: 960px;
   height: 600px;
@@ -161,7 +165,7 @@ footer {
   float: right;
 }
 
-.buttonbox.bbright ~ hr {\
+.buttonbox.bbright ~ hr {
   margin-top: 4px;
   margin-bottom: 4px;
   opacity: 0.15;
@@ -193,8 +197,39 @@ td.blank {
   min-width: 5em;
 }
 
+#add_point {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+#remove_point {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+
+#add_point,
+#remove_point {
+}
+
 #num_points {
-  width: 2em;
+  position: relative;
+  font-weight: bold;
+  font-family: monospace;
+  font-size: 16px;
+  padding: 0;
+  cursor: auto;
+  display: inline-block;
+  text-align: center !important;
+  height: 16px;
+  width: 16px;
+  min-height: 16px;
+  min-width: 16px;
+  max-height: 16px;
+  max-width: 16px;
 }
 
 .buttonbox + .buttonbox {
