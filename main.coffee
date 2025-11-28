@@ -8,6 +8,9 @@ class Vec2
       x: a.x + (amount * (b.x - a.x))
       y: a.y + (amount * (b.y - a.y))
 
+  @magnitude: (v) ->
+    Math.sqrt((v.x * v.x) + (v.y * v.y))
+
   @scale: (v, scale) ->
     return
       x: v.x * scale
@@ -198,6 +201,8 @@ class LERPingSplines
   @point_labels: "ABCDEFGHIJKLM"
   @point_label_height: 22
 
+  @pen_label_height: 22
+
   @mouseover_point_radius_boost: 6
 
   constructor: (@context) ->
@@ -264,6 +269,19 @@ class LERPingSplines
     @context.addEventListener('mousemove', @on_mousemove)
     @context.addEventListener('mousedown', @on_mousedown)
     @context.addEventListener('mouseup',   @on_mouseup)
+
+    @draw_pen_label = true
+    @pen_label = 'P'
+    @pen_label_metrics = APP.graph_ctx.measureText(@pen_label)
+    @pen_label_width   = @pen_label_metrics.width
+    @pen_label_height  = LERPingSplines.pen_label_height
+    @pen_label_offset =
+      x: @pen_label_width  / 2
+      y: @pen_label_height / 2
+    console.log(Vec2)
+    @pen_label_offset_length = Vec2.magnitude(@pen_label_offset)
+
+    console.log('pen_label_offset', @pen_label_offset)
 
     console.log('init() completed!')
 
@@ -543,13 +561,13 @@ class LERPingSplines
 
       normal = Vec2.normalize(normal)
 
-      arrow    = Vec2.scale(normal, 22.0)
-      arrowtip = Vec2.scale(normal, 15.0)
-      normal   = Vec2.scale(normal, 65.0)
+      arrow       = Vec2.scale(normal, 22.0)
+      arrowtip    = Vec2.scale(normal, 15.0)
+      arrow_shaft = Vec2.scale(normal, 65.0)
 
       angle = TAU / 8.0
-      arrow1 = Vec2.rotate(arrow, angle)
-      arrow2 = Vec2.rotate(arrow, -angle)
+      arrow_side1 = Vec2.rotate(arrow, angle)
+      arrow_side2 = Vec2.rotate(arrow, -angle)
 
       arrowtip.x += @pen.position.x
       arrowtip.y += @pen.position.y
@@ -557,15 +575,22 @@ class LERPingSplines
       ctx = @graph_ctx
       ctx.beginPath()
       ctx.moveTo(arrowtip.x, arrowtip.y)
-      ctx.lineTo(arrowtip.x + normal.x, arrowtip.y + normal.y)
+      ctx.lineTo(arrowtip.x + arrow_shaft.x, arrowtip.y + arrow_shaft.y)
       ctx.moveTo(arrowtip.x, arrowtip.y)
-      ctx.lineTo(arrowtip.x + arrow1.x, arrowtip.y + arrow1.y)
+      ctx.lineTo(arrowtip.x + arrow_side1.x, arrowtip.y + arrow_side1.y)
       ctx.moveTo(arrowtip.x, arrowtip.y)
-      ctx.lineTo(arrowtip.x + arrow2.x, arrowtip.y + arrow2.y)
+      ctx.lineTo(arrowtip.x + arrow_side2.x, arrowtip.y + arrow_side2.y)
       ctx.strokeStyle = '#000000'
       ctx.lineWidth = 2
       ctx.lineCap = "round"
       ctx.stroke()
+
+      if @draw_pen_label = true
+        plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), @pen_label_offset_length + 3)
+        plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - @pen_label_offset.x
+        ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - @pen_label_offset.y + @pen_label_height
+        ctx.fillStyle = '#000'
+        ctx.fillText(@pen_label, plx, ply);
 
   update_and_draw: ->
     @graph_ctx.clearRect(0, 0, @graph_canvas.width, @graph_canvas.height)

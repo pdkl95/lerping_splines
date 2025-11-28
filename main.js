@@ -18,6 +18,10 @@
       };
     };
 
+    Vec2.magnitude = function(v) {
+      return Math.sqrt((v.x * v.x) + (v.y * v.y));
+    };
+
     Vec2.scale = function(v, scale) {
       return {
         x: v.x * scale,
@@ -243,6 +247,8 @@
 
     LERPingSplines.point_label_height = 22;
 
+    LERPingSplines.pen_label_height = 22;
+
     LERPingSplines.mouseover_point_radius_boost = 6;
 
     function LERPingSplines(context) {
@@ -314,6 +320,18 @@
       this.context.addEventListener('mousemove', this.on_mousemove);
       this.context.addEventListener('mousedown', this.on_mousedown);
       this.context.addEventListener('mouseup', this.on_mouseup);
+      this.draw_pen_label = true;
+      this.pen_label = 'P';
+      this.pen_label_metrics = APP.graph_ctx.measureText(this.pen_label);
+      this.pen_label_width = this.pen_label_metrics.width;
+      this.pen_label_height = LERPingSplines.pen_label_height;
+      this.pen_label_offset = {
+        x: this.pen_label_width / 2,
+        y: this.pen_label_height / 2
+      };
+      console.log(Vec2);
+      this.pen_label_offset_length = Vec2.magnitude(this.pen_label_offset);
+      console.log('pen_label_offset', this.pen_label_offset);
       console.log('init() completed!');
       this.add_initial_points();
       this.update();
@@ -705,7 +723,7 @@
     };
 
     LERPingSplines.prototype.draw_pen = function() {
-      var angle, arrow, arrow1, arrow2, arrowtip, ctx, normal;
+      var angle, arrow, arrow_shaft, arrow_side1, arrow_side2, arrowtip, ctx, normal, plabel_offset, plx, ply;
       if (this.pen == null) {
         return;
       }
@@ -721,24 +739,31 @@
         normal = Vec2.normalize(normal);
         arrow = Vec2.scale(normal, 22.0);
         arrowtip = Vec2.scale(normal, 15.0);
-        normal = Vec2.scale(normal, 65.0);
+        arrow_shaft = Vec2.scale(normal, 65.0);
         angle = TAU / 8.0;
-        arrow1 = Vec2.rotate(arrow, angle);
-        arrow2 = Vec2.rotate(arrow, -angle);
+        arrow_side1 = Vec2.rotate(arrow, angle);
+        arrow_side2 = Vec2.rotate(arrow, -angle);
         arrowtip.x += this.pen.position.x;
         arrowtip.y += this.pen.position.y;
         ctx = this.graph_ctx;
         ctx.beginPath();
         ctx.moveTo(arrowtip.x, arrowtip.y);
-        ctx.lineTo(arrowtip.x + normal.x, arrowtip.y + normal.y);
+        ctx.lineTo(arrowtip.x + arrow_shaft.x, arrowtip.y + arrow_shaft.y);
         ctx.moveTo(arrowtip.x, arrowtip.y);
-        ctx.lineTo(arrowtip.x + arrow1.x, arrowtip.y + arrow1.y);
+        ctx.lineTo(arrowtip.x + arrow_side1.x, arrowtip.y + arrow_side1.y);
         ctx.moveTo(arrowtip.x, arrowtip.y);
-        ctx.lineTo(arrowtip.x + arrow2.x, arrowtip.y + arrow2.y);
+        ctx.lineTo(arrowtip.x + arrow_side2.x, arrowtip.y + arrow_side2.y);
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 2;
         ctx.lineCap = "round";
-        return ctx.stroke();
+        ctx.stroke();
+        if (this.draw_pen_label = true) {
+          plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), this.pen_label_offset_length + 3);
+          plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - this.pen_label_offset.x;
+          ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - this.pen_label_offset.y + this.pen_label_height;
+          ctx.fillStyle = '#000';
+          return ctx.fillText(this.pen_label, plx, ply);
+        }
       }
     };
 
