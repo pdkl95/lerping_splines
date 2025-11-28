@@ -143,6 +143,9 @@ class LERP extends Point
       x: null
       y: null
 
+  generate_label: ->
+    @label = "#{@from.label}#{@to.label}"
+
   interpolate: (t, a, b) ->
     (t * b) + ((1 - t) * a)
 
@@ -211,6 +214,8 @@ class LERPingSplines
     console.log('Starting init()...')
 
     @running = false
+    @pen_label_enabled = true
+    @algorithm_enabled = true
 
     @content_el       = @context.getElementById('content')
 
@@ -238,7 +243,6 @@ class LERPingSplines
     @reset_loop()
 
     @btn_play_pause = @context.getElementById('button_play_pause')
-    console.log(@btn_play_pause)
     @btn_play_pause.addEventListener('click',@on_btn_play_pause_click)
 
     @num_points = @context.getElementById('num_points')
@@ -270,7 +274,6 @@ class LERPingSplines
     @context.addEventListener('mousedown', @on_mousedown)
     @context.addEventListener('mouseup',   @on_mouseup)
 
-    @draw_pen_label = true
     @pen_label = 'P'
     @pen_label_metrics = APP.graph_ctx.measureText(@pen_label)
     @pen_label_width   = @pen_label_metrics.width
@@ -278,10 +281,11 @@ class LERPingSplines
     @pen_label_offset =
       x: @pen_label_width  / 2
       y: @pen_label_height / 2
-    console.log(Vec2)
+
     @pen_label_offset_length = Vec2.magnitude(@pen_label_offset)
 
-    console.log('pen_label_offset', @pen_label_offset)
+    @algorithmbox   = @find_element('algorithmbox')
+    @algorithm_text = @find_element('algorithm_text')
 
     console.log('init() completed!')
 
@@ -289,10 +293,15 @@ class LERPingSplines
     @update()
     @stop()
 
+    if @algorithm_enabled
+      @show_algorithm()
+    else
+      @hide_algorithm()
+
   debug: (msg_text) ->
     unless @debugbox?
       @debugbox = @context.getElementById('debugbox')
-      @debugbox.removeClass('hidden')
+      @debugbox.classList.remove('hidden')
 
     hdr = $('<span/>',  class: 'hdr')
     msg = $('<span/>',  class: 'msg')
@@ -305,6 +314,11 @@ class LERPingSplines
     @debugbox.append(line)
 
     @debugbox.animate({ scrollTop: @debugbox.prop("scrollHeight")}, 600);
+
+  find_element: (id) ->
+    el = @context.getElementById(id)
+    @debug("ERROR: missing element ##{id}") unless el?
+    el
 
   reset_loop: ->
     @t = 0
@@ -334,6 +348,7 @@ class LERPingSplines
       for j in [0..(LERPingSplines.max_points - order)]
         lerp = new LERP( order, prev[j], prev[j+1] )
         @points[order][j] = lerp
+        @points[order][j].generate_label()
 
     @enable_point_at( 0.06, 0.85 )
     @enable_point_at( 0.15, 0.08 )
@@ -364,6 +379,18 @@ class LERPingSplines
     @num_points.textContent = "#{@enabled_points}"
 
     @update()
+
+    p = null
+    for i in [(LERPingSplines.max_points - 1)..1]
+      p = @points[i][0]
+      if p?.enabled
+        break
+    if p?
+      @pen = p
+    else
+      @debug("ERROR: no pen?!")
+
+    @update_algorithm()
 
   enable_point: ->
     return if @enabled_points >= LERPingSplines.max_points
@@ -447,6 +474,34 @@ class LERPingSplines
     @running = false
     @btn_play_pause.innerHTML = "&#x23F5;"
 
+  update_algorithm: ->
+    lines = []
+    for order in [0..(@enabled_points - 1)]
+      if order > 0
+        lines.push ""
+        lines.push "### Order #{order} Bezier"
+      else
+        lines.push "### Points"
+
+      for p in @points[order]
+        continue unless p.enabled
+        label = if p is @pen then @pen_label else p.label
+        if order > 0
+          lines.push "#{label} = Lerp(#{p.from.label}, #{p.to.label}, t)"
+        else
+          lines.push "#{label} = <#{parseInt(p.position.x, 10)}, #{parseInt(p.position.y, 10)}>"
+
+    @algorithm_text.innerText = lines.join("\n")
+
+  show_algorithm: =>
+    @algorithm_enabled = true
+    @algorithmbox.classList.remove('hidden')
+    @update_algorithm()
+
+  hide_algorithm: =>
+    @algorithm_enabled = false
+    @algorithmbox.classList.add('hidden')
+
   clamp_to_canvas: (v) ->
     v.x = @point_move_margin.min_x if v.x < @point_move_margin.min_x
     v.y = @point_move_margin.min_y if v.y < @point_move_margin.min_y
@@ -459,6 +514,10 @@ class LERPingSplines
     coord =
       x: event.pageX - cc.left
       y: event.pageY - cc.top
+
+    coord.x -= window.scrollX
+    coord.y -= window.scrollY
+
     @clamp_to_canvas(coord)
 
   on_mousemove: (event) =>
@@ -468,6 +527,8 @@ class LERPingSplines
         oldx = p.x
         oldy = p.y
         if p.selected
+          if (p.x != mouse.x) or (p.y != mouse.y)
+            @point_has_changed = true
           p.x = mouse.x
           p.y = mouse.y
 
@@ -481,6 +542,7 @@ class LERPingSplines
           @update_and_draw()
 
   on_mousedown: (event) =>
+    @point_has_changed = false
     mouse = @get_mouse_coord(event)
     p = @find_point(mouse.x, mouse.y)
     if p?
@@ -490,6 +552,9 @@ class LERPingSplines
     for order in @points
       for p in order
         p.selected = false
+
+    if @point_has_changed and @algorithm_enabled
+      @update_algorithm()
 
   redraw_ui: (render_bitmap_preview = true) =>
     @graph_ui_ctx.clearRect(0, 0, @graph_ui_canvas.width, @graph_ui_canvas.height)
@@ -519,6 +584,12 @@ class LERPingSplines
       if p?.enabled
         break
 
+    @debug("missing pen") unless @pen?
+    if p isnt @pen
+      console.log('p',p)
+      console.log('@pen',@pen)
+    p = @pen
+
     ctx = @graph_ctx
     ctx.beginPath()
     ctx.strokeStyle = p.color
@@ -533,8 +604,6 @@ class LERPingSplines
       ctx.lineTo(p.position.x, p.position.y)
 
     ctx.stroke()
-
-    @pen = p
 
   draw: ->
     for order in @points
@@ -585,7 +654,7 @@ class LERPingSplines
       ctx.lineCap = "round"
       ctx.stroke()
 
-      if @draw_pen_label = true
+      if @pen_label_enabled
         plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), @pen_label_offset_length + 3)
         plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - @pen_label_offset.x
         ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - @pen_label_offset.y + @pen_label_height

@@ -80,8 +80,8 @@
       this.move(x, y);
     }
 
-    Point.prototype.set_label = function(label) {
-      this.label = label;
+    Point.prototype.set_label = function(label1) {
+      this.label = label1;
       this.label_metrics = APP.graph_ctx.measureText(this.label);
       this.label_width = this.label_metrics.width;
       return this.label_height = LERPingSplines.point_label_height;
@@ -185,6 +185,10 @@
       };
     }
 
+    LERP.prototype.generate_label = function() {
+      return this.label = "" + this.from.label + this.to.label;
+    };
+
     LERP.prototype.interpolate = function(t, a, b) {
       return (t * b) + ((1 - t) * a);
     };
@@ -263,6 +267,8 @@
       this.on_mouseup = bind(this.on_mouseup, this);
       this.on_mousedown = bind(this.on_mousedown, this);
       this.on_mousemove = bind(this.on_mousemove, this);
+      this.hide_algorithm = bind(this.hide_algorithm, this);
+      this.show_algorithm = bind(this.show_algorithm, this);
       this.stop = bind(this.stop, this);
       this.start = bind(this.start, this);
       this.on_tslider_stop = bind(this.on_tslider_stop, this);
@@ -280,6 +286,8 @@
       var ref, ref1;
       console.log('Starting init()...');
       this.running = false;
+      this.pen_label_enabled = true;
+      this.algorithm_enabled = true;
       this.content_el = this.context.getElementById('content');
       this.graph_wrapper = this.context.getElementById('graph_wrapper');
       this.graph_canvas = this.context.getElementById('graph');
@@ -299,7 +307,6 @@
       this.enabled_points = 0;
       this.reset_loop();
       this.btn_play_pause = this.context.getElementById('button_play_pause');
-      console.log(this.btn_play_pause);
       this.btn_play_pause.addEventListener('click', this.on_btn_play_pause_click);
       this.num_points = this.context.getElementById('num_points');
       this.add_point_btn = this.context.getElementById('add_point');
@@ -320,7 +327,6 @@
       this.context.addEventListener('mousemove', this.on_mousemove);
       this.context.addEventListener('mousedown', this.on_mousedown);
       this.context.addEventListener('mouseup', this.on_mouseup);
-      this.draw_pen_label = true;
       this.pen_label = 'P';
       this.pen_label_metrics = APP.graph_ctx.measureText(this.pen_label);
       this.pen_label_width = this.pen_label_metrics.width;
@@ -329,20 +335,25 @@
         x: this.pen_label_width / 2,
         y: this.pen_label_height / 2
       };
-      console.log(Vec2);
       this.pen_label_offset_length = Vec2.magnitude(this.pen_label_offset);
-      console.log('pen_label_offset', this.pen_label_offset);
+      this.algorithmbox = this.find_element('algorithmbox');
+      this.algorithm_text = this.find_element('algorithm_text');
       console.log('init() completed!');
       this.add_initial_points();
       this.update();
-      return this.stop();
+      this.stop();
+      if (this.algorithm_enabled) {
+        return this.show_algorithm();
+      } else {
+        return this.hide_algorithm();
+      }
     };
 
     LERPingSplines.prototype.debug = function(msg_text) {
       var hdr, line, msg, timestamp;
       if (this.debugbox == null) {
         this.debugbox = this.context.getElementById('debugbox');
-        this.debugbox.removeClass('hidden');
+        this.debugbox.classList.remove('hidden');
       }
       hdr = $('<span/>', {
         "class": 'hdr'
@@ -360,6 +371,15 @@
       return this.debugbox.animate({
         scrollTop: this.debugbox.prop("scrollHeight")
       }, 600);
+    };
+
+    LERPingSplines.prototype.find_element = function(id) {
+      var el;
+      el = this.context.getElementById(id);
+      if (el == null) {
+        this.debug("ERROR: missing element #" + id);
+      }
+      return el;
     };
 
     LERPingSplines.prototype.reset_loop = function() {
@@ -393,6 +413,7 @@
         for (j = m = 0, ref2 = LERPingSplines.max_points - order; 0 <= ref2 ? m <= ref2 : m >= ref2; j = 0 <= ref2 ? ++m : --m) {
           lerp = new LERP(order, prev[j], prev[j + 1]);
           this.points[order][j] = lerp;
+          this.points[order][j].generate_label();
         }
       }
       this.enable_point_at(0.06, 0.85);
@@ -416,6 +437,7 @@
     };
 
     LERPingSplines.prototype.update_enabled_points = function() {
+      var i, k, p, ref;
       if (this.enabled_points < LERPingSplines.max_points) {
         this.add_point_btn.disabled = false;
       } else {
@@ -427,7 +449,20 @@
         this.remove_point_btn.disabled = true;
       }
       this.num_points.textContent = "" + this.enabled_points;
-      return this.update();
+      this.update();
+      p = null;
+      for (i = k = ref = LERPingSplines.max_points - 1; ref <= 1 ? k <= 1 : k >= 1; i = ref <= 1 ? ++k : --k) {
+        p = this.points[i][0];
+        if (p != null ? p.enabled : void 0) {
+          break;
+        }
+      }
+      if (p != null) {
+        this.pen = p;
+      } else {
+        this.debug("ERROR: no pen?!");
+      }
+      return this.update_algorithm();
     };
 
     LERPingSplines.prototype.enable_point = function() {
@@ -537,6 +572,44 @@
       return this.btn_play_pause.innerHTML = "&#x23F5;";
     };
 
+    LERPingSplines.prototype.update_algorithm = function() {
+      var k, l, label, len, lines, order, p, ref, ref1;
+      lines = [];
+      for (order = k = 0, ref = this.enabled_points - 1; 0 <= ref ? k <= ref : k >= ref; order = 0 <= ref ? ++k : --k) {
+        if (order > 0) {
+          lines.push("");
+          lines.push("### Order " + order + " Bezier");
+        } else {
+          lines.push("### Points");
+        }
+        ref1 = this.points[order];
+        for (l = 0, len = ref1.length; l < len; l++) {
+          p = ref1[l];
+          if (!p.enabled) {
+            continue;
+          }
+          label = p === this.pen ? this.pen_label : p.label;
+          if (order > 0) {
+            lines.push(label + " = Lerp(" + p.from.label + ", " + p.to.label + ", t)");
+          } else {
+            lines.push(label + " = <" + (parseInt(p.position.x, 10)) + ", " + (parseInt(p.position.y, 10)) + ">");
+          }
+        }
+      }
+      return this.algorithm_text.innerText = lines.join("\n");
+    };
+
+    LERPingSplines.prototype.show_algorithm = function() {
+      this.algorithm_enabled = true;
+      this.algorithmbox.classList.remove('hidden');
+      return this.update_algorithm();
+    };
+
+    LERPingSplines.prototype.hide_algorithm = function() {
+      this.algorithm_enabled = false;
+      return this.algorithmbox.classList.add('hidden');
+    };
+
     LERPingSplines.prototype.clamp_to_canvas = function(v) {
       if (v.x < this.point_move_margin.min_x) {
         v.x = this.point_move_margin.min_x;
@@ -560,6 +633,8 @@
         x: event.pageX - cc.left,
         y: event.pageY - cc.top
       };
+      coord.x -= window.scrollX;
+      coord.y -= window.scrollY;
       return this.clamp_to_canvas(coord);
     };
 
@@ -578,6 +653,9 @@
             oldx = p.x;
             oldy = p.y;
             if (p.selected) {
+              if ((p.x !== mouse.x) || (p.y !== mouse.y)) {
+                this.point_has_changed = true;
+              }
               p.x = mouse.x;
               p.y = mouse.y;
             }
@@ -601,6 +679,7 @@
 
     LERPingSplines.prototype.on_mousedown = function(event) {
       var mouse, p;
+      this.point_has_changed = false;
       mouse = this.get_mouse_coord(event);
       p = this.find_point(mouse.x, mouse.y);
       if (p != null) {
@@ -609,22 +688,18 @@
     };
 
     LERPingSplines.prototype.on_mouseup = function(event) {
-      var k, len, order, p, ref, results;
+      var k, l, len, len1, order, p, ref;
       ref = this.points;
-      results = [];
       for (k = 0, len = ref.length; k < len; k++) {
         order = ref[k];
-        results.push((function() {
-          var l, len1, results1;
-          results1 = [];
-          for (l = 0, len1 = order.length; l < len1; l++) {
-            p = order[l];
-            results1.push(p.selected = false);
-          }
-          return results1;
-        })());
+        for (l = 0, len1 = order.length; l < len1; l++) {
+          p = order[l];
+          p.selected = false;
+        }
       }
-      return results;
+      if (this.point_has_changed && this.algorithm_enabled) {
+        return this.update_algorithm();
+      }
     };
 
     LERPingSplines.prototype.redraw_ui = function(render_bitmap_preview) {
@@ -680,6 +755,14 @@
           break;
         }
       }
+      if (this.pen == null) {
+        this.debug("missing pen");
+      }
+      if (p !== this.pen) {
+        console.log('p', p);
+        console.log('@pen', this.pen);
+      }
+      p = this.pen;
       ctx = this.graph_ctx;
       ctx.beginPath();
       ctx.strokeStyle = p.color;
@@ -692,8 +775,7 @@
         this.update_at(t);
         ctx.lineTo(p.position.x, p.position.y);
       }
-      ctx.stroke();
-      return this.pen = p;
+      return ctx.stroke();
     };
 
     LERPingSplines.prototype.draw = function() {
@@ -757,7 +839,7 @@
         ctx.lineWidth = 2;
         ctx.lineCap = "round";
         ctx.stroke();
-        if (this.draw_pen_label = true) {
+        if (this.pen_label_enabled) {
           plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), this.pen_label_offset_length + 3);
           plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - this.pen_label_offset.x;
           ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - this.pen_label_offset.y + this.pen_label_height;

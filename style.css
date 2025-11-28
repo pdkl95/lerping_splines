@@ -277,3 +277,8 @@ td.blank {
 .highlight > td {
   background-color: #F9FBB6;
 }
+
+#algorithmbox > pre {
+  margin-left: 0;
+  margin-right: 0;
+}
