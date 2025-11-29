@@ -3,12 +3,25 @@
 Generating a
 [Bézier curve](https://en.wikipedia.org/wiki/B%C3%A9zier_curve)
 only requires stacking
-[linear interpolations](https://en.wikipedia.org/wiki/Linear_interpolation
+[linear interpolations](https://en.wikipedia.org/wiki/Linear_interpolation)
 (lerp).
 
-## Use
+## Features
 
-Check out the repository (or
+* Interactive curve rendering, with each lerp visualized.
+
+* Bézier curves can be order 1 through 8
+
+* Generates matching pseudocode.
+
+## Usage
+
+Try it live on GitHub:
+
+[https://pdkl95.github.io/lerping_splines/](https://pdkl95.github.io/lerping_splines/)
+
+
+Or, check out the repository (or
 [download a snapshot](https://github.com/pdkl95/lerping_splines/archive/refs/heads/main.zip))
 and open `lerping_splines.html` in a browser.
 
