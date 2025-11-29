@@ -32,9 +32,12 @@
           <pre>t = <span id="tvar">0</span></pre>
         </div>
         <div id="tbox2" class="buttonbox">
-          <div id="tbox_slider_btn_min"></div>
-          <div id="tbox_slider"></div>
-          <div id="tbox_slider_btn_max"></div>
+          <button id="tbox_slider_btn_min" class="tbox_slider_btn">&#x23EE;</button>
+          <div id="tbox_slider_wrapper">
+            <div id="tbox_slider"></div>
+            <div id="tbox_slider_handle"></div>
+          </div>
+          <button id="tbox_slider_btn_max" class="tbox_slider_btn">&#x23ED;</button>
         </div>
 
         <div class="pointsbox buttonbox bbright">
@@ -49,8 +52,8 @@
       <h2>Algorithm</h2>
       <h4>Lerp: Linear Intrpolaton</h4>
       <pre>function Lerp(vector1, vector2, t) {
-    return ( ((1-t) * vector1) +
-             (   t  * vector2) )
+    return ((1-t) * vector1) +
+           (   t  * vector2)
 }</pre>
       <h4>It's Lerp All The Way Down</h4>
       <pre id="algorithm_text"></pre>

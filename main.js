@@ -87,6 +87,10 @@
       return this.label_height = LERPingSplines.point_label_height;
     };
 
+    Point.prototype.get_label = function() {
+      return this.label;
+    };
+
     Point.prototype.move = function(x, y) {
       this.x = x;
       this.y = y;
@@ -185,8 +189,17 @@
       };
     }
 
-    LERP.prototype.generate_label = function() {
-      return this.label = "" + this.from.label + this.to.label;
+    LERP.prototype.generate_label = function(order, index) {
+      this.label = "" + this.from.label + this.to.label;
+      return this.alg_label = "temp_" + order + "_" + index;
+    };
+
+    LERP.prototype.get_label = function() {
+      if (APP.alt_algorithm_names) {
+        return this.alg_label;
+      } else {
+        return this.label;
+      }
     };
 
     LERP.prototype.interpolate = function(t, a, b) {
@@ -265,18 +278,19 @@
       this.update_at = bind(this.update_at, this);
       this.redraw_ui = bind(this.redraw_ui, this);
       this.on_mouseup = bind(this.on_mouseup, this);
+      this.on_mouseup_canvas = bind(this.on_mouseup_canvas, this);
+      this.on_mouseup_tslider = bind(this.on_mouseup_tslider, this);
       this.on_mousedown = bind(this.on_mousedown, this);
+      this.on_tslider_mousedown = bind(this.on_tslider_mousedown, this);
       this.on_mousemove = bind(this.on_mousemove, this);
+      this.on_mousemove_canvas = bind(this.on_mousemove_canvas, this);
+      this.on_mousemove_tslider = bind(this.on_mousemove_tslider, this);
       this.hide_algorithm = bind(this.hide_algorithm, this);
       this.show_algorithm = bind(this.show_algorithm, this);
       this.stop = bind(this.stop, this);
       this.start = bind(this.start, this);
-      this.on_tslider_stop = bind(this.on_tslider_stop, this);
-      this.on_tslider_start = bind(this.on_tslider_start, this);
       this.on_tslide_btn_max_click = bind(this.on_tslide_btn_max_click, this);
       this.on_tslide_btn_min_click = bind(this.on_tslide_btn_min_click, this);
-      this.on_tslider_changer = bind(this.on_tslider_changer, this);
-      this.on_tslider_slide = bind(this.on_tslider_slide, this);
       this.on_btn_play_pause_click = bind(this.on_btn_play_pause_click, this);
       this.on_remove_point_btn_click = bind(this.on_remove_point_btn_click, this);
       this.on_add_point_btn_click = bind(this.on_add_point_btn_click, this);
@@ -288,9 +302,10 @@
       this.running = false;
       this.pen_label_enabled = true;
       this.algorithm_enabled = true;
+      this.alt_algorithm_names = true;
       this.content_el = this.context.getElementById('content');
-      this.graph_wrapper = this.context.getElementById('graph_wrapper');
-      this.graph_canvas = this.context.getElementById('graph');
+      this.graph_wrapper = this.find_element('graph_wrapper');
+      this.graph_canvas = this.find_element('graph');
       this.graph_ctx = this.graph_canvas.getContext('2d', {
         alpha: true
       });
@@ -305,25 +320,32 @@
       };
       this.points = [];
       this.enabled_points = 0;
+      this.tvar = this.context.getElementById('tvar');
+      this.tslider_btn_min = this.find_element('tbox_slider_btn_min');
+      this.tslider_btn_min.addEventListener('click', this.on_tslide_btn_min_click);
+      this.tslider_btn_max = this.find_element('tbox_slider_btn_max');
+      this.tslider_btn_max.addEventListener('click', this.on_tslide_btn_max_click);
+      this.tslider = {
+        handle: this.find_element('tbox_slider_handle'),
+        min: 0,
+        max: 264,
+        drag_active: false
+      };
+      this.tslider.position = this.tslider.min;
+      this.tslider.range = this.tslider.max - this.tslider.min;
+      this.tslider.handle.addEventListener('mousedown', this.on_tslider_mousedown);
       this.reset_loop();
-      this.btn_play_pause = this.context.getElementById('button_play_pause');
+      this.btn_play_pause = this.find_element('button_play_pause');
       this.btn_play_pause.addEventListener('click', this.on_btn_play_pause_click);
-      this.num_points = this.context.getElementById('num_points');
-      this.add_point_btn = this.context.getElementById('add_point');
+      this.num_points = this.find_element('num_points');
+      this.add_point_btn = this.find_element('add_point');
       if ((ref = this.add_point_btn) != null) {
         ref.addEventListener('click', this.on_add_point_btn_click);
       }
-      this.remove_point_btn = this.context.getElementById('remove_point');
+      this.remove_point_btn = this.find_element('remove_point');
       if ((ref1 = this.remove_point_btn) != null) {
         ref1.addEventListener('click', this.on_remove_point_btn_click);
       }
-      this.tvar = this.context.getElementById('tvar');
-      this.tslider_btn_min = this.context.getElementById('tbox_slider_btn_min');
-      this.tslider_btn_min.addEventListener('click', this.on_tslide_btn_min_click);
-      this.tslider_btn_max = this.context.getElementById('tbox_slider_btn_max');
-      this.tslider_btn_max.addEventListener('click', this.on_tslide_btn_max_click);
-      this.tslider_saved_running_status = this.running;
-      this.tslider = this.context.getElementById('tbox_slider');
       this.context.addEventListener('mousemove', this.on_mousemove);
       this.context.addEventListener('mousedown', this.on_mousedown);
       this.context.addEventListener('mouseup', this.on_mouseup);
@@ -384,7 +406,8 @@
 
     LERPingSplines.prototype.reset_loop = function() {
       this.t = 0;
-      return this.t_step = 0.002;
+      this.t_step = 0.002;
+      return this.set_tslider_position(this.tslider.min);
     };
 
     LERPingSplines.prototype.loop_start = function() {
@@ -413,7 +436,7 @@
         for (j = m = 0, ref2 = LERPingSplines.max_points - order; 0 <= ref2 ? m <= ref2 : m >= ref2; j = 0 <= ref2 ? ++m : --m) {
           lerp = new LERP(order, prev[j], prev[j + 1]);
           this.points[order][j] = lerp;
-          this.points[order][j].generate_label();
+          this.points[order][j].generate_label(order, j);
         }
       }
       this.enable_point_at(0.06, 0.85);
@@ -515,38 +538,26 @@
       }
     };
 
-    LERPingSplines.prototype.on_tslider_slide = function(event, ui) {
-      var v;
-      v = this.tslider.slider("option", "value");
-      this.set_t(v);
-      return this.update_and_draw();
-    };
-
-    LERPingSplines.prototype.on_tslider_changer = function(event, ui) {
-      this.on_tslider_slide(event, ui);
-      return this.update_and_draw();
+    LERPingSplines.prototype.set_tslider_position = function(x) {
+      if (x < this.tslider.min) {
+        x = this.tslider.min;
+      }
+      if (x > this.tslider.max) {
+        x = this.tslider.max;
+      }
+      this.tslider.position = x;
+      this.tslider.handle.style.left = x + "px";
+      return this.set_t((x - this.tslider.min) / this.tslider.range);
     };
 
     LERPingSplines.prototype.on_tslide_btn_min_click = function() {
-      this.set_t(0.0);
+      this.set_tslider_position(this.tslider.min);
       return this.update_and_draw();
     };
 
     LERPingSplines.prototype.on_tslide_btn_max_click = function() {
-      this.set_t(1.0);
+      this.set_tslider_position(this.tslider.max);
       return this.update_and_draw();
-    };
-
-    LERPingSplines.prototype.on_tslider_start = function() {
-      return console.log('tslider start');
-    };
-
-    LERPingSplines.prototype.on_tslider_stop = function() {
-      console.log('tslider stop');
-      this.update_and_draw();
-      if (this.running) {
-        return this.start();
-      }
     };
 
     LERPingSplines.prototype.set_t = function(value) {
@@ -554,7 +565,17 @@
       while (this.t > 1.0) {
         this.t -= 1.0;
       }
-      return this.tvar.textContent = this.t.toFixed(2);
+      this.tvar.textContent = this.t.toFixed(2);
+      if (this.t === 0.0) {
+        this.tslider_btn_min.disabled = true;
+      } else {
+        this.tslider_btn_min.disabled = false;
+      }
+      if (this.t === 1.0) {
+        return this.tslider_btn_max.disabled = true;
+      } else {
+        return this.tslider_btn_max.disabled = false;
+      }
     };
 
     LERPingSplines.prototype.start = function() {
@@ -588,9 +609,9 @@
           if (!p.enabled) {
             continue;
           }
-          label = p === this.pen ? this.pen_label : p.label;
+          label = p === this.pen ? this.pen_label : p.get_label();
           if (order > 0) {
-            lines.push(label + " = Lerp(" + p.from.label + ", " + p.to.label + ", t)");
+            lines.push(label + " = Lerp(" + (p.from.get_label()) + ", " + (p.to.get_label()) + ", t)");
           } else {
             lines.push(label + " = <" + (parseInt(p.position.x, 10)) + ", " + (parseInt(p.position.y, 10)) + ">");
           }
@@ -638,7 +659,15 @@
       return this.clamp_to_canvas(coord);
     };
 
-    LERPingSplines.prototype.on_mousemove = function(event) {
+    LERPingSplines.prototype.on_mousemove_tslider = function(event) {
+      var mouse, offset;
+      mouse = this.get_mouse_coord(event);
+      offset = mouse.x - this.tslider.drag_start;
+      this.set_tslider_position(this.tslider.drag_start_position + offset);
+      return this.update_and_draw();
+    };
+
+    LERPingSplines.prototype.on_mousemove_canvas = function(event) {
       var k, len, mouse, oldhover, oldx, oldy, order, p, ref, results;
       mouse = this.get_mouse_coord(event);
       ref = this.points;
@@ -677,6 +706,26 @@
       return results;
     };
 
+    LERPingSplines.prototype.on_mousemove = function(event) {
+      if (this.tslider.drag_active) {
+        return this.on_mousemove_tslider(event);
+      } else {
+        return this.on_mousemove_canvas(event);
+      }
+    };
+
+    LERPingSplines.prototype.on_tslider_mousedown = function(event) {
+      var mouse;
+      this.tslider.drag_active = true;
+      mouse = this.get_mouse_coord(event);
+      this.tslider.drag_start = mouse.x;
+      this.tslider.drag_start_position = this.tslider.position;
+      this.tslider.handle.classList.add('drag');
+      if (this.running) {
+        return this.stop();
+      }
+    };
+
     LERPingSplines.prototype.on_mousedown = function(event) {
       var mouse, p;
       this.point_has_changed = false;
@@ -687,7 +736,12 @@
       }
     };
 
-    LERPingSplines.prototype.on_mouseup = function(event) {
+    LERPingSplines.prototype.on_mouseup_tslider = function(event) {
+      this.tslider.drag_active = false;
+      return this.tslider.handle.classList.remove('drag');
+    };
+
+    LERPingSplines.prototype.on_mouseup_canvas = function(event) {
       var k, l, len, len1, order, p, ref;
       ref = this.points;
       for (k = 0, len = ref.length; k < len; k++) {
@@ -699,6 +753,14 @@
       }
       if (this.point_has_changed && this.algorithm_enabled) {
         return this.update_algorithm();
+      }
+    };
+
+    LERPingSplines.prototype.on_mouseup = function(event) {
+      if (this.tslider.drag_active) {
+        return this.on_mouseup_tslider(event);
+      } else {
+        return this.on_mouseup_canvas(event);
       }
     };
 
@@ -864,6 +926,7 @@
       if (elapsed > 0) {
         this.prev_anim_timestamp = this.anim_timestamp;
         this.set_t(this.t + this.t_step);
+        this.set_tslider_position(this.tslider.min + (this.t * this.tslider.range));
         this.update_and_draw();
       }
       if (this.running) {

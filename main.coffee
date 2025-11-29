@@ -64,6 +64,9 @@ class Point
     @label_width   = @label_metrics.width
     @label_height  = LERPingSplines.point_label_height
 
+  get_label: ->
+    @label
+
   move: (x, y) ->
     @x = x
     @y = y
@@ -143,8 +146,15 @@ class LERP extends Point
       x: null
       y: null
 
-  generate_label: ->
+  generate_label: (order, index) ->
     @label = "#{@from.label}#{@to.label}"
+    @alg_label = "temp_#{order}_#{index}"
+
+  get_label: ->
+    if APP.alt_algorithm_names
+      @alg_label
+    else
+      @label
 
   interpolate: (t, a, b) ->
     (t * b) + ((1 - t) * a)
@@ -216,11 +226,12 @@ class LERPingSplines
     @running = false
     @pen_label_enabled = true
     @algorithm_enabled = true
+    @alt_algorithm_names = true
 
     @content_el       = @context.getElementById('content')
 
-    @graph_wrapper   = @context.getElementById('graph_wrapper')
-    @graph_canvas    = @context.getElementById('graph')
+    @graph_wrapper   = @find_element('graph_wrapper')
+    @graph_canvas    = @find_element('graph')
     #@graph_ui_canvas = @context.getElementById('graph_ui')
 
     @graph_ctx    = @graph_canvas.getContext('2d', alpha: true)
@@ -240,35 +251,35 @@ class LERPingSplines
     @points = []
     @enabled_points = 0
 
-    @reset_loop()
-
-    @btn_play_pause = @context.getElementById('button_play_pause')
-    @btn_play_pause.addEventListener('click',@on_btn_play_pause_click)
-
-    @num_points = @context.getElementById('num_points')
-
-    @add_point_btn = @context.getElementById('add_point')
-    @add_point_btn?.addEventListener('click', @on_add_point_btn_click)
-
-    @remove_point_btn = @context.getElementById('remove_point')
-    @remove_point_btn?.addEventListener('click', @on_remove_point_btn_click)
-
     @tvar = @context.getElementById('tvar')
 
-    @tslider_btn_min = @context.getElementById('tbox_slider_btn_min')
+    @tslider_btn_min = @find_element('tbox_slider_btn_min')
     @tslider_btn_min.addEventListener('click', @on_tslide_btn_min_click)
 
-    @tslider_btn_max = @context.getElementById('tbox_slider_btn_max')
+    @tslider_btn_max = @find_element('tbox_slider_btn_max')
     @tslider_btn_max.addEventListener('click', @on_tslide_btn_max_click)
 
-    @tslider_saved_running_status = @running
-    @tslider = @context.getElementById('tbox_slider')
-      # min:   0.0
-      # max:   1.0
-      # step:  0.01
-      # change: @on_tslider_change
-      # slide:  @on_tslider_slide
-      # stop:   @on_tslider_stop
+    @tslider =
+      handle: @find_element('tbox_slider_handle')
+      min: 0
+      max: 264
+      drag_active: false
+    @tslider.position = @tslider.min
+    @tslider.range = @tslider.max - @tslider.min
+    @tslider.handle.addEventListener('mousedown', @on_tslider_mousedown)
+
+    @reset_loop()
+
+    @btn_play_pause = @find_element('button_play_pause')
+    @btn_play_pause.addEventListener('click',@on_btn_play_pause_click)
+
+    @num_points = @find_element('num_points')
+
+    @add_point_btn = @find_element('add_point')
+    @add_point_btn?.addEventListener('click', @on_add_point_btn_click)
+
+    @remove_point_btn = @find_element('remove_point')
+    @remove_point_btn?.addEventListener('click', @on_remove_point_btn_click)
 
     @context.addEventListener('mousemove', @on_mousemove)
     @context.addEventListener('mousedown', @on_mousedown)
@@ -323,6 +334,7 @@ class LERPingSplines
   reset_loop: ->
     @t = 0
     @t_step = 0.002
+    @set_tslider_position(@tslider.min)
 
   loop_start: ->
     @loop_running = true
@@ -348,7 +360,7 @@ class LERPingSplines
       for j in [0..(LERPingSplines.max_points - order)]
         lerp = new LERP( order, prev[j], prev[j+1] )
         @points[order][j] = lerp
-        @points[order][j].generate_label()
+        @points[order][j].generate_label(order, j)
 
     @enable_point_at( 0.06, 0.85 )
     @enable_point_at( 0.15, 0.08 )
@@ -428,39 +440,36 @@ class LERPingSplines
     else
       @start()
 
-  on_tslider_slide: (event, ui) =>
-    v = @tslider.slider("option", "value");
-    @set_t(v)
-    @update_and_draw()
+  set_tslider_position: (x) ->
+    x = @tslider.min if x < @tslider.min
+    x = @tslider.max if x > @tslider.max
 
-  on_tslider_changer: (event, ui) =>
-    @on_tslider_slide(event, ui)
-    @update_and_draw()
+    @tslider.position = x
+    @tslider.handle.style.left = "#{x}px"
+    @set_t( (x - @tslider.min) / @tslider.range )
 
   on_tslide_btn_min_click: =>
-    @set_t(0.0)
+    @set_tslider_position(@tslider.min)
     @update_and_draw()
 
   on_tslide_btn_max_click: =>
-    @set_t(1.0)
+    @set_tslider_position(@tslider.max)
     @update_and_draw()
-
-  on_tslider_start: =>
-    console.log('tslider start')
-    #@tslider_saved_running_status = @running
-    #@stop()
-
-  on_tslider_stop: =>
-    console.log('tslider stop')
-    #@running = @tslider_saved_running_status
-    @update_and_draw()
-    @start() if @running
 
   set_t: (value) ->
     @t = value
     @t -= 1.0 while @t > 1.0
     @tvar.textContent = (@t.toFixed(2))
-    #@tslider.slider("option", "value", @t)
+
+    if @t == 0.0
+      @tslider_btn_min.disabled = true
+    else
+      @tslider_btn_min.disabled = false
+
+    if @t == 1.0
+      @tslider_btn_max.disabled = true
+    else
+      @tslider_btn_max.disabled = false
 
   start: =>
     if @running
@@ -485,9 +494,11 @@ class LERPingSplines
 
       for p in @points[order]
         continue unless p.enabled
-        label = if p is @pen then @pen_label else p.label
+
+        label = if p is @pen then @pen_label else p.get_label()
+
         if order > 0
-          lines.push "#{label} = Lerp(#{p.from.label}, #{p.to.label}, t)"
+          lines.push "#{label} = Lerp(#{p.from.get_label()}, #{p.to.get_label()}, t)"
         else
           lines.push "#{label} = <#{parseInt(p.position.x, 10)}, #{parseInt(p.position.y, 10)}>"
 
@@ -520,7 +531,13 @@ class LERPingSplines
 
     @clamp_to_canvas(coord)
 
-  on_mousemove: (event) =>
+  on_mousemove_tslider: (event) =>
+    mouse = @get_mouse_coord(event)
+    offset = mouse.x - @tslider.drag_start
+    @set_tslider_position(@tslider.drag_start_position + offset)
+    @update_and_draw()
+
+  on_mousemove_canvas: (event) =>
     mouse = @get_mouse_coord(event)
     for order in @points
       for p in order
@@ -541,6 +558,20 @@ class LERPingSplines
         if (p.hover != oldhover) or (p.x != oldx) or (p.y != oldy)
           @update_and_draw()
 
+  on_mousemove: (event) =>
+    if @tslider.drag_active
+      @on_mousemove_tslider(event)
+    else
+      @on_mousemove_canvas(event)
+
+  on_tslider_mousedown: (event) =>
+    @tslider.drag_active = true
+    mouse = @get_mouse_coord(event)
+    @tslider.drag_start = mouse.x
+    @tslider.drag_start_position = @tslider.position
+    @tslider.handle.classList.add('drag')
+    @stop() if @running
+
   on_mousedown: (event) =>
     @point_has_changed = false
     mouse = @get_mouse_coord(event)
@@ -548,13 +579,23 @@ class LERPingSplines
     if p?
       p.selected = true
 
-  on_mouseup: (event) =>
+  on_mouseup_tslider: (event) =>
+    @tslider.drag_active = false
+    @tslider.handle.classList.remove('drag')
+
+  on_mouseup_canvas: (event) =>
     for order in @points
       for p in order
         p.selected = false
 
     if @point_has_changed and @algorithm_enabled
       @update_algorithm()
+
+  on_mouseup: (event) =>
+    if @tslider.drag_active
+      @on_mouseup_tslider(event)
+    else
+      @on_mouseup_canvas(event)
 
   redraw_ui: (render_bitmap_preview = true) =>
     @graph_ui_ctx.clearRect(0, 0, @graph_ui_canvas.width, @graph_ui_canvas.height)
@@ -674,6 +715,7 @@ class LERPingSplines
     if elapsed > 0
       @prev_anim_timestamp = @anim_timestamp
       @set_t( @t + @t_step )
+      @set_tslider_position(@tslider.min + (@t * @tslider.range))
       @update_and_draw()
 
     @schedule_next_frame() if @running
