@@ -2,42 +2,6 @@ APP = null
 
 TAU = 2 * Math.PI
 
-class Vec2
-  @lerp: (a, b, amount) ->
-    return
-      x: a.x + (amount * (b.x - a.x))
-      y: a.y + (amount * (b.y - a.y))
-
-  @magnitude: (v) ->
-    Math.sqrt((v.x * v.x) + (v.y * v.y))
-
-  @scale: (v, scale) ->
-    return
-      x: v.x * scale
-      y: v.y * scale
-
-  @rotate: (v, angle) ->
-    c = Math.cos(angle)
-    s = Math.sin(angle)
-    return
-      x: (v.x * c) - (v.y * s)
-      y: (v.x * s) + (v.y * c)
-
-  @normalize: (v) ->
-    result =
-      x: 0.0
-      y: 0.0
-
-    length = Math.sqrt((v.x*v.x) + (v.y*v.y))
-
-    if length > 0
-      ilength = 1.0 / length;
-      result.x = v.x * ilength
-      result.y = v.y * ilength
-
-    result
-
-
 class Point
   constructor: (x, y, @color) ->
     @enabled = false
@@ -407,33 +371,114 @@ class LERPingSplines
 
     @update_algorithm()
 
-  enable_point: ->
+  enable_point: (rebalance_points) ->
     return if @enabled_points >= LERPingSplines.max_points
     p = @points[0][@enabled_points]
-    @enabled_points += 1
+
+    if rebalance_points
+      cur_id = @enabled_points
+      prev_id = cur_id - 1
+      while prev_id >= 0
+        cur  = @points[0][cur_id]
+        prev = @points[0][prev_id]
+
+        k = @enabled_points
+
+        x = ((k - cur_id) / k) * cur.position.x + (cur_id / k) * prev.position.x
+        y = ((k - cur_id) / k) * cur.position.y + (cur_id / k) * prev.position.y
+
+        cur.move(x, y)
+
+        cur_id--
+        prev_id--
+
     p.enabled = true
+    @enabled_points += 1
     @update_enabled_points()
     p
 
   enable_point_at: (x, y) ->
-    p = @enable_point()
+    p = @enable_point(false)
     p.x = x * @graph_width
     p.y = y * @graph_height
     p
 
+  compute_lower_order_curve: ->
+    points = @points[0].map (point) ->
+      return
+        x: point.position.x
+        y: point.position.y
+
+    `/* copied from: https://pomax.github.io/bezierinfo/chapters/reordering/reorder.js */
+
+    // Based on https://www.sirver.net/blog/2011/08/23/degree-reduction-of-bezier-curves/
+
+    // TODO: FIXME: this is the same code as in the old codebase,
+    //              and it does something odd to the either the
+    //              first or last point... it starts to travel
+    //              A LOT more than it looks like it should... O_o
+
+    p = points,
+    k = p.length,
+    data = [],
+    n = k-1;
+
+    //if (k <= 3) return;
+
+    // build M, which will be (k) rows by (k-1) columns
+    for(let i=0; i<k; i++) {
+      data[i] = (new Array(k - 1)).fill(0);
+      if(i===0) { data[i][0] = 1; }
+      else if(i===n) { data[i][i-1] = 1; }
+      else {
+        data[i][i-1] = i / k;
+        data[i][i] = 1 - data[i][i-1];
+      }
+    }
+
+    // Apply our matrix operations:
+    const M = new Matrix(data);
+    const Mt = M.transpose(M);
+    const Mc = Mt.multiply(M);
+    const Mi = Mc.invert();
+
+    if (!Mi) {
+      return console.error('MtM has no inverse?');
+    }
+
+    // And then we map our k-order list of coordinates
+    // to an n-order list of coordinates, instead:
+    const V = Mi.multiply(Mt);
+    const x = new Matrix(points.map(p => [p.x]));
+    const nx = V.multiply(x);
+    const y = new Matrix(points.map(p => [p.y]));
+    const ny = V.multiply(y);
+
+    points = nx.data.map((x,i) => ({
+      x: x[0],
+      y: ny.data[i][0]
+    }));`
+
+    for i in [0...points.length]
+      p = @clamp_to_canvas(points[i])
+      @points[0][i].move(p.x, p.y)
+    
   disable_point: ->
     return if @enabled_points <= LERPingSplines.min_points
+
+    if @enabled_points > 3
+      @compute_lower_order_curve()
+
     @enabled_points -= 1
     p = @points[0][@enabled_points]
     p.enabled = false
     @update_enabled_points()
-    p
 
   on_show_ticks_checkbox: (event, ui) =>
     @update_and_draw()
 
   on_add_point_btn_click: (event, ui) =>
-    @enable_point()
+    @enable_point(true)
     @update_and_draw()
 
   on_remove_point_btn_click: (event, ui) =>

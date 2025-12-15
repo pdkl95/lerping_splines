@@ -1,12 +1,39 @@
 (function() {
-  var APP, LERP, LERPingSplines, Point, TAU, Vec2,
+  var APP, LERP, LERPingSplines, Point, TAU, Vec2, clone,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
-  APP = null;
-
-  TAU = 2 * Math.PI;
+  clone = function(obj) {
+    var flags, key, newInstance;
+    if ((obj == null) || typeof obj !== 'object') {
+      return obj;
+    }
+    if (obj instanceof Date) {
+      return new Date(obj.getTime());
+    }
+    if (obj instanceof RegExp) {
+      flags = '';
+      if (obj.global != null) {
+        flags += 'g';
+      }
+      if (obj.ignoreCase != null) {
+        flags += 'i';
+      }
+      if (obj.multiline != null) {
+        flags += 'm';
+      }
+      if (obj.sticky != null) {
+        flags += 'y';
+      }
+      return new RegExp(obj.source, flags);
+    }
+    newInstance = new obj.constructor();
+    for (key in obj) {
+      newInstance[key] = clone(obj[key]);
+    }
+    return newInstance;
+  };
 
   Vec2 = (function() {
     function Vec2() {}
@@ -57,6 +84,180 @@
     return Vec2;
 
   })();
+
+  
+/* copied from: https://raw.githubusercontent.com/Pomax/bezierinfo/refs/heads/master/js/graphics-element/api/types/matrix.js */
+
+function invert(M) {
+  // Copied from http://blog.acipo.com/matrix-inversion-in-javascript/
+  // With permission, http://blog.acipo.com/matrix-inversion-in-javascript/#comment-5057289889
+
+  // (1) 'augment' the matrix (left) by the identity (on the right)
+  // (2) Turn the matrix on the left into the identity by elemetry row ops
+  // (3) The matrix on the right is the inverse (was the identity matrix)
+  // There are 3 elemtary row ops:
+  // (a) Swap 2 rows
+  // (b) Multiply a row by a scalar
+  // (c) Add 2 rows
+
+  //if the matrix isn't square: exit (error)
+  if (M.length !== M[0].length) {
+    console.log("not square");
+    return;
+  }
+
+  //create the identity matrix (I), and a copy (C) of the original
+  var i = 0,
+    ii = 0,
+    j = 0,
+    dim = M.length,
+    e = 0,
+    t = 0;
+  var I = [],
+    C = [];
+  for (i = 0; i < dim; i += 1) {
+    // Create the row
+    I[I.length] = [];
+    C[C.length] = [];
+    for (j = 0; j < dim; j += 1) {
+      //if we're on the diagonal, put a 1 (for identity)
+      if (i == j) {
+        I[i][j] = 1;
+      } else {
+        I[i][j] = 0;
+      }
+
+      // Also, make the copy of the original
+      C[i][j] = M[i][j];
+    }
+  }
+
+  // Perform elementary row operations
+  for (i = 0; i < dim; i += 1) {
+    // get the element e on the diagonal
+    e = C[i][i];
+
+    // if we have a 0 on the diagonal (we'll need to swap with a lower row)
+    if (e == 0) {
+      //look through every row below the i'th row
+      for (ii = i + 1; ii < dim; ii += 1) {
+        //if the ii'th row has a non-0 in the i'th col
+        if (C[ii][i] != 0) {
+          //it would make the diagonal have a non-0 so swap it
+          for (j = 0; j < dim; j++) {
+            e = C[i][j]; //temp store i'th row
+            C[i][j] = C[ii][j]; //replace i'th row by ii'th
+            C[ii][j] = e; //repace ii'th by temp
+            e = I[i][j]; //temp store i'th row
+            I[i][j] = I[ii][j]; //replace i'th row by ii'th
+            I[ii][j] = e; //repace ii'th by temp
+          }
+          //don't bother checking other rows since we've swapped
+          break;
+        }
+      }
+      //get the new diagonal
+      e = C[i][i];
+      //if it's still 0, not invertable (error)
+      if (e == 0) {
+        return;
+      }
+    }
+
+    // Scale this row down by e (so we have a 1 on the diagonal)
+    for (j = 0; j < dim; j++) {
+      C[i][j] = C[i][j] / e; //apply to original matrix
+      I[i][j] = I[i][j] / e; //apply to identity
+    }
+
+    // Subtract this row (scaled appropriately for each row) from ALL of
+    // the other rows so that there will be 0's in this column in the
+    // rows above and below this one
+    for (ii = 0; ii < dim; ii++) {
+      // Only apply to other rows (we want a 1 on the diagonal)
+      if (ii == i) {
+        continue;
+      }
+
+      // We want to change this element to 0
+      e = C[ii][i];
+
+      // Subtract (the row above(or below) scaled by e) from (the
+      // current row) but start at the i'th column and assume all the
+      // stuff left of diagonal is 0 (which it should be if we made this
+      // algorithm correctly)
+      for (j = 0; j < dim; j++) {
+        C[ii][j] -= e * C[i][j]; //apply to original matrix
+        I[ii][j] -= e * I[i][j]; //apply to identity
+      }
+    }
+  }
+
+  //we've done all operations, C should be the identity
+  //matrix I should be the inverse:
+  return I;
+}
+
+function multiply(m1, m2) {
+  var M = [];
+  var m2t = transpose(m2);
+  m1.forEach((row, r) => {
+    M[r] = [];
+    m2t.forEach((col, c) => {
+      M[r][c] = row.map((v, i) => col[i] * v).reduce((a, v) => a + v, 0);
+    });
+  });
+  return M;
+}
+
+function transpose(M) {
+  return M[0].map((col, i) => M.map((row) => row[i]));
+}
+
+class Matrix {
+  constructor(n, m, data) {
+    data = n instanceof Array ? n : data;
+    this.data = data ?? [...new Array(n)].map((v) => [...new Array(m)].map((v) => 0));
+    this.rows = this.data.length;
+    this.cols = this.data[0].length;
+  }
+  setData(data) {
+    this.data = data;
+  }
+  get(i, j) {
+    return this.data[i][j];
+  }
+  set(i, j, value) {
+    this.data[i][j] = value;
+  }
+  row(i) {
+    return this.data[i];
+  }
+  col(j) {
+    var d = this.data,
+      col = [];
+    for (let r = 0, l = d.length; r < l; r++) {
+      col.push(d[r][j]);
+    }
+    return col;
+  }
+  multiply(other) {
+    return new Matrix(multiply(this.data, other.data));
+  }
+  invert() {
+    return new Matrix(invert(this.data));
+  }
+  transpose() {
+    return new Matrix(transpose(this.data));
+  }
+}
+
+/*export { Matrix };*/
+;
+
+  APP = null;
+
+  TAU = 2 * Math.PI;
 
   Point = (function() {
     function Point(x, y, color) {
@@ -422,21 +623,21 @@
     };
 
     LERPingSplines.prototype.add_initial_points = function() {
-      var i, j, k, l, lerp, m, margin, order, prev, prev_order, range, ref, ref1, ref2, x, y;
+      var i, j, l, lerp, m, margin, n, order, prev, prev_order, range, ref, ref1, ref2, x, y;
       margin = LERPingSplines.create_point_margin;
       range = 1.0 - (2.0 * margin);
       this.points[0] = [];
-      for (i = k = 0, ref = LERPingSplines.max_points; 0 <= ref ? k <= ref : k >= ref; i = 0 <= ref ? ++k : --k) {
+      for (i = l = 0, ref = LERPingSplines.max_points; 0 <= ref ? l <= ref : l >= ref; i = 0 <= ref ? ++l : --l) {
         x = margin + (range * Math.random());
         y = margin + (range * Math.random());
         this.points[0][i] = new Point(x * this.graph_width, y * this.graph_height);
         this.points[0][i].set_label(LERPingSplines.point_labels[i]);
       }
-      for (order = l = 1, ref1 = LERPingSplines.max_points; 1 <= ref1 ? l <= ref1 : l >= ref1; order = 1 <= ref1 ? ++l : --l) {
+      for (order = m = 1, ref1 = LERPingSplines.max_points; 1 <= ref1 ? m <= ref1 : m >= ref1; order = 1 <= ref1 ? ++m : --m) {
         this.points[order] = [];
         prev_order = order - 1;
         prev = this.points[prev_order];
-        for (j = m = 0, ref2 = LERPingSplines.max_points - order; 0 <= ref2 ? m <= ref2 : m >= ref2; j = 0 <= ref2 ? ++m : --m) {
+        for (j = n = 0, ref2 = LERPingSplines.max_points - order; 0 <= ref2 ? n <= ref2 : n >= ref2; j = 0 <= ref2 ? ++n : --n) {
           lerp = new LERP(order, prev[j], prev[j + 1]);
           this.points[order][j] = lerp;
           this.points[order][j].generate_label(order, j);
@@ -451,10 +652,10 @@
     };
 
     LERPingSplines.prototype.find_point = function(x, y) {
-      var k, len, p, ref;
+      var l, len, p, ref;
       ref = this.points[0];
-      for (k = 0, len = ref.length; k < len; k++) {
-        p = ref[k];
+      for (l = 0, len = ref.length; l < len; l++) {
+        p = ref[l];
         if (p != null ? p.contains(x, y) : void 0) {
           return p;
         }
@@ -463,7 +664,7 @@
     };
 
     LERPingSplines.prototype.update_enabled_points = function() {
-      var i, k, p, ref;
+      var i, l, p, ref;
       if (this.enabled_points < LERPingSplines.max_points) {
         this.add_point_btn.disabled = false;
       } else {
@@ -477,7 +678,7 @@
       this.num_points.textContent = "" + this.enabled_points;
       this.update();
       p = null;
-      for (i = k = ref = LERPingSplines.max_points - 1; ref <= 1 ? k <= 1 : k >= 1; i = ref <= 1 ? ++k : --k) {
+      for (i = l = ref = LERPingSplines.max_points - 1; ref <= 1 ? l <= 1 : l >= 1; i = ref <= 1 ? ++l : --l) {
         p = this.points[i][0];
         if (p != null ? p.enabled : void 0) {
           break;
@@ -491,24 +692,103 @@
       return this.update_algorithm();
     };
 
-    LERPingSplines.prototype.enable_point = function() {
-      var p;
+    LERPingSplines.prototype.enable_point = function(rebalance_points) {
+      var cur, cur_id, k, p, prev, prev_id, x, y;
       if (this.enabled_points >= LERPingSplines.max_points) {
         return;
       }
       p = this.points[0][this.enabled_points];
-      this.enabled_points += 1;
+      if (rebalance_points) {
+        cur_id = this.enabled_points;
+        prev_id = cur_id - 1;
+        while (prev_id >= 0) {
+          cur = this.points[0][cur_id];
+          prev = this.points[0][prev_id];
+          k = this.enabled_points;
+          x = ((k - cur_id) / k) * cur.position.x + (cur_id / k) * prev.position.x;
+          y = ((k - cur_id) / k) * cur.position.y + (cur_id / k) * prev.position.y;
+          cur.move(x, y);
+          cur_id--;
+          prev_id--;
+        }
+      }
       p.enabled = true;
+      this.enabled_points += 1;
       this.update_enabled_points();
       return p;
     };
 
     LERPingSplines.prototype.enable_point_at = function(x, y) {
       var p;
-      p = this.enable_point();
+      p = this.enable_point(false);
       p.x = x * this.graph_width;
       p.y = y * this.graph_height;
       return p;
+    };
+
+    LERPingSplines.prototype.compute_lower_order_curve = function() {
+      var i, l, p, points, ref, results;
+      points = this.points[0].map(function(point) {
+        return {
+          x: point.position.x,
+          y: point.position.y
+        };
+      });
+      /* copied from: https://pomax.github.io/bezierinfo/chapters/reordering/reorder.js */
+
+    // Based on https://www.sirver.net/blog/2011/08/23/degree-reduction-of-bezier-curves/
+
+    // TODO: FIXME: this is the same code as in the old codebase,
+    //              and it does something odd to the either the
+    //              first or last point... it starts to travel
+    //              A LOT more than it looks like it should... O_o
+
+    p = points,
+    k = p.length,
+    data = [],
+    n = k-1;
+
+    //if (k <= 3) return;
+
+    // build M, which will be (k) rows by (k-1) columns
+    for(let i=0; i<k; i++) {
+      data[i] = (new Array(k - 1)).fill(0);
+      if(i===0) { data[i][0] = 1; }
+      else if(i===n) { data[i][i-1] = 1; }
+      else {
+        data[i][i-1] = i / k;
+        data[i][i] = 1 - data[i][i-1];
+      }
+    }
+
+    // Apply our matrix operations:
+    const M = new Matrix(data);
+    const Mt = M.transpose(M);
+    const Mc = Mt.multiply(M);
+    const Mi = Mc.invert();
+
+    if (!Mi) {
+      return console.error('MtM has no inverse?');
+    }
+
+    // And then we map our k-order list of coordinates
+    // to an n-order list of coordinates, instead:
+    const V = Mi.multiply(Mt);
+    const x = new Matrix(points.map(p => [p.x]));
+    const nx = V.multiply(x);
+    const y = new Matrix(points.map(p => [p.y]));
+    const ny = V.multiply(y);
+
+    points = nx.data.map((x,i) => ({
+      x: x[0],
+      y: ny.data[i][0]
+    }));;
+      results = [];
+      for (i = l = 0, ref = points.length; 0 <= ref ? l < ref : l > ref; i = 0 <= ref ? ++l : --l) {
+        p = this.clamp_to_canvas(points[i]);
+        results.push(this.points[0][i].move(p.x, p.y));
+      }
+      return results;
     };
 
     LERPingSplines.prototype.disable_point = function() {
@@ -516,11 +796,13 @@
       if (this.enabled_points <= LERPingSplines.min_points) {
         return;
       }
+      if (this.enabled_points > 3) {
+        this.compute_lower_order_curve();
+      }
       this.enabled_points -= 1;
       p = this.points[0][this.enabled_points];
       p.enabled = false;
-      this.update_enabled_points();
-      return p;
+      return this.update_enabled_points();
     };
 
     LERPingSplines.prototype.on_show_ticks_checkbox = function(event, ui) {
@@ -528,7 +810,7 @@
     };
 
     LERPingSplines.prototype.on_add_point_btn_click = function(event, ui) {
-      this.enable_point();
+      this.enable_point(true);
       return this.update_and_draw();
     };
 
@@ -601,9 +883,9 @@
     };
 
     LERPingSplines.prototype.update_algorithm = function() {
-      var k, l, label, len, lines, order, p, ref, ref1;
+      var l, label, len, lines, m, order, p, ref, ref1;
       lines = [];
-      for (order = k = 0, ref = this.enabled_points - 1; 0 <= ref ? k <= ref : k >= ref; order = 0 <= ref ? ++k : --k) {
+      for (order = l = 0, ref = this.enabled_points - 1; 0 <= ref ? l <= ref : l >= ref; order = 0 <= ref ? ++l : --l) {
         if (order > 0) {
           lines.push("");
           lines.push("### Order " + order + " Bezier");
@@ -611,8 +893,8 @@
           lines.push("### Points");
         }
         ref1 = this.points[order];
-        for (l = 0, len = ref1.length; l < len; l++) {
-          p = ref1[l];
+        for (m = 0, len = ref1.length; m < len; m++) {
+          p = ref1[m];
           if (!p.enabled) {
             continue;
           }
@@ -675,17 +957,17 @@
     };
 
     LERPingSplines.prototype.on_mousemove_canvas = function(event) {
-      var k, len, mouse, oldhover, oldx, oldy, order, p, ref, results;
+      var l, len, mouse, oldhover, oldx, oldy, order, p, ref, results;
       mouse = this.get_mouse_coord(event);
       ref = this.points;
       results = [];
-      for (k = 0, len = ref.length; k < len; k++) {
-        order = ref[k];
+      for (l = 0, len = ref.length; l < len; l++) {
+        order = ref[l];
         results.push((function() {
-          var l, len1, results1;
+          var len1, m, results1;
           results1 = [];
-          for (l = 0, len1 = order.length; l < len1; l++) {
-            p = order[l];
+          for (m = 0, len1 = order.length; m < len1; m++) {
+            p = order[m];
             oldx = p.x;
             oldy = p.y;
             if (p.selected) {
@@ -749,12 +1031,12 @@
     };
 
     LERPingSplines.prototype.on_mouseup_canvas = function(event) {
-      var k, l, len, len1, order, p, ref;
+      var l, len, len1, m, order, p, ref;
       ref = this.points;
-      for (k = 0, len = ref.length; k < len; k++) {
-        order = ref[k];
-        for (l = 0, len1 = order.length; l < len1; l++) {
-          p = order[l];
+      for (l = 0, len = ref.length; l < len; l++) {
+        order = ref[l];
+        for (m = 0, len1 = order.length; m < len1; m++) {
+          p = order[m];
           p.selected = false;
         }
       }
@@ -772,7 +1054,7 @@
     };
 
     LERPingSplines.prototype.redraw_ui = function(render_bitmap_preview) {
-      var k, l, len, len1, order, p, ref, ref1;
+      var l, len, len1, m, order, p, ref, ref1;
       if (render_bitmap_preview == null) {
         render_bitmap_preview = true;
       }
@@ -781,10 +1063,10 @@
         ref.draw_ui();
       }
       ref1 = this.points;
-      for (k = 0, len = ref1.length; k < len; k++) {
-        order = ref1[k];
-        for (l = 0, len1 = order.length; l < len1; l++) {
-          p = order[l];
+      for (l = 0, len = ref1.length; l < len; l++) {
+        order = ref1[l];
+        for (m = 0, len1 = order.length; m < len1; m++) {
+          p = order[m];
           p.draw_ui();
         }
       }
@@ -792,16 +1074,16 @@
     };
 
     LERPingSplines.prototype.update_at = function(t) {
-      var k, len, order, p, ref, results;
+      var l, len, order, p, ref, results;
       ref = this.points;
       results = [];
-      for (k = 0, len = ref.length; k < len; k++) {
-        order = ref[k];
+      for (l = 0, len = ref.length; l < len; l++) {
+        order = ref[l];
         results.push((function() {
-          var l, len1, results1;
+          var len1, m, results1;
           results1 = [];
-          for (l = 0, len1 = order.length; l < len1; l++) {
-            p = order[l];
+          for (m = 0, len1 = order.length; m < len1; m++) {
+            p = order[m];
             results1.push(p.update(t));
           }
           return results1;
@@ -815,10 +1097,10 @@
     };
 
     LERPingSplines.prototype.draw_bezier = function() {
-      var ctx, i, k, p, ref, start, t;
+      var ctx, i, l, p, ref, start, t;
       start = this.points[0][0];
       p = null;
-      for (i = k = ref = LERPingSplines.max_points - 1; ref <= 1 ? k <= 1 : k >= 1; i = ref <= 1 ? ++k : --k) {
+      for (i = l = ref = LERPingSplines.max_points - 1; ref <= 1 ? l <= 1 : l >= 1; i = ref <= 1 ? ++l : --l) {
         p = this.points[i][0];
         if (p != null ? p.enabled : void 0) {
           break;
@@ -848,26 +1130,26 @@
     };
 
     LERPingSplines.prototype.draw = function() {
-      var k, l, len, len1, len2, len3, m, n, order, p, ref, ref1, ref2, results;
+      var l, len, len1, len2, len3, m, n, o, order, p, ref, ref1, ref2, results;
       ref = this.points;
-      for (k = 0, len = ref.length; k < len; k++) {
-        order = ref[k];
-        for (l = 0, len1 = order.length; l < len1; l++) {
-          p = order[l];
+      for (l = 0, len = ref.length; l < len; l++) {
+        order = ref[l];
+        for (m = 0, len1 = order.length; m < len1; m++) {
+          p = order[m];
           if (p.order > 1) {
             p.draw();
           }
         }
       }
       ref1 = this.points[1];
-      for (m = 0, len2 = ref1.length; m < len2; m++) {
-        p = ref1[m];
+      for (n = 0, len2 = ref1.length; n < len2; n++) {
+        p = ref1[n];
         p.draw();
       }
       ref2 = this.points[0];
       results = [];
-      for (n = 0, len3 = ref2.length; n < len3; n++) {
-        p = ref2[n];
+      for (o = 0, len3 = ref2.length; o < len3; o++) {
+        p = ref2[o];
         results.push(p.draw());
       }
       return results;
