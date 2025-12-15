@@ -41,7 +41,11 @@
         </div>
 
         <div class="pointsbox buttonbox bbright">
-          <div id="points_wrapper"><div id="points_label">Points</div><button id="remove_point" class="btn">&#x2796;</button><div id="num_points">4</div><button id="add_point" class="btn">&#x2795;</button></div>
+          <div id="points_wrapper" class="bbwrapper"><label id="points_label" for="num_points" class="bbwrappeditem">Points</label><button id="remove_point" class="btn bbwrappeditem">&#x2796;</button><div name="num_points" id="num_points" class="bbwrappeditem">4</div><button id="add_point" class="btn bbwrappeditem">&#x2795;</button></div>
+        </div>
+
+        <div class="optbox buttonbox bbright">
+          <div id="show_ticks_wrapper" class="bbwrapper"><label for="show_ticks" id="show_ticks_label" class="bbwrappeditem">Tick Marks</label><input type="checkbox" name="show_ticks" id="show_ticks" class="bbwrappeditem"></input></div>
         </div>
       </div>
     </div>
@@ -61,7 +65,9 @@
 
     <div class="clear_both"></div>
 
-    <footer></footer>
+    <footer>
+      <a href="https://github.com/pdkl95/lerping_splines">Source Code</a>
+    </footer>
 
     <script type="text/javascript" src="main.js"></script>
   </body>
