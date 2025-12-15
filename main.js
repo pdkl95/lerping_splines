@@ -294,6 +294,7 @@
       this.on_btn_play_pause_click = bind(this.on_btn_play_pause_click, this);
       this.on_remove_point_btn_click = bind(this.on_remove_point_btn_click, this);
       this.on_add_point_btn_click = bind(this.on_add_point_btn_click, this);
+      this.on_show_ticks_checkbox = bind(this.on_show_ticks_checkbox, this);
     }
 
     LERPingSplines.prototype.init = function() {
@@ -335,6 +336,8 @@
       this.tslider.range = this.tslider.max - this.tslider.min;
       this.tslider.handle.addEventListener('mousedown', this.on_tslider_mousedown);
       this.reset_loop();
+      this.show_ticks_checkbox = this.find_element('show_ticks');
+      this.show_ticks_checkbox.addEventListener('change', this.on_show_ticks_checkbox);
       this.btn_play_pause = this.find_element('button_play_pause');
       this.btn_play_pause.addEventListener('click', this.on_btn_play_pause_click);
       this.num_points = this.find_element('num_points');
@@ -518,6 +521,10 @@
       p.enabled = false;
       this.update_enabled_points();
       return p;
+    };
+
+    LERPingSplines.prototype.on_show_ticks_checkbox = function(event, ui) {
+      return this.update_and_draw();
     };
 
     LERPingSplines.prototype.on_add_point_btn_click = function(event, ui) {
@@ -866,11 +873,8 @@
       return results;
     };
 
-    LERPingSplines.prototype.draw_pen = function() {
-      var angle, arrow, arrow_shaft, arrow_side1, arrow_side2, arrowtip, ctx, normal, plabel_offset, plx, ply;
-      if (this.pen == null) {
-        return;
-      }
+    LERPingSplines.prototype.get_normal = function() {
+      var normal;
       this.update_at(this.t - this.t_step);
       this.pen.prev_position.x = this.pen.position.x;
       this.pen.prev_position.y = this.pen.position.y;
@@ -880,7 +884,19 @@
           x: -(this.pen.position.y - this.pen.prev_position.y),
           y: this.pen.position.x - this.pen.prev_position.x
         };
-        normal = Vec2.normalize(normal);
+        return Vec2.normalize(normal);
+      } else {
+        return null;
+      }
+    };
+
+    LERPingSplines.prototype.draw_pen = function() {
+      var angle, arrow, arrow_shaft, arrow_side1, arrow_side2, arrowtip, ctx, normal, plabel_offset, plx, ply;
+      if (this.pen == null) {
+        return;
+      }
+      normal = this.get_normal();
+      if (normal != null) {
         arrow = Vec2.scale(normal, 22.0);
         arrowtip = Vec2.scale(normal, 15.0);
         arrow_shaft = Vec2.scale(normal, 65.0);
@@ -911,8 +927,72 @@
       }
     };
 
+    LERPingSplines.prototype.draw_tick_at = function(t, size) {
+      var ctx, normal, point_a_x, point_a_y, point_b_x, point_b_y, t_save;
+      if (this.pen == null) {
+        return;
+      }
+      t_save = this.t;
+      this.t = t;
+      normal = this.get_normal();
+      if (normal != null) {
+        normal = Vec2.scale(normal, 3 + (4.0 * size));
+        point_a_x = this.pen.position.x + normal.x;
+        point_a_y = this.pen.position.y + normal.y;
+        point_b_x = this.pen.position.x - normal.x;
+        point_b_y = this.pen.position.y - normal.y;
+        ctx = this.graph_ctx;
+        ctx.beginPath();
+        ctx.moveTo(point_a_x, point_a_y);
+        ctx.lineTo(point_b_x, point_b_y);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = size > 3 ? 2 : 1;
+        ctx.stroke();
+      }
+      return this.t = t_save;
+    };
+
+    LERPingSplines.prototype.draw_ticks = function() {
+      this.draw_tick_at(0.0, 5);
+      this.draw_tick_at(0.03125, 1);
+      this.draw_tick_at(0.0625, 2);
+      this.draw_tick_at(0.09375, 1);
+      this.draw_tick_at(0.125, 3);
+      this.draw_tick_at(0.15625, 1);
+      this.draw_tick_at(0.1875, 2);
+      this.draw_tick_at(0.21875, 1);
+      this.draw_tick_at(0.25, 4);
+      this.draw_tick_at(0.28125, 1);
+      this.draw_tick_at(0.3125, 2);
+      this.draw_tick_at(0.34375, 1);
+      this.draw_tick_at(0.375, 3);
+      this.draw_tick_at(0.40625, 1);
+      this.draw_tick_at(0.4375, 2);
+      this.draw_tick_at(0.46875, 1);
+      this.draw_tick_at(0.5, 5);
+      this.draw_tick_at(0.53125, 1);
+      this.draw_tick_at(0.5625, 2);
+      this.draw_tick_at(0.59375, 1);
+      this.draw_tick_at(0.625, 3);
+      this.draw_tick_at(0.65625, 1);
+      this.draw_tick_at(0.6875, 2);
+      this.draw_tick_at(0.71875, 1);
+      this.draw_tick_at(0.75, 4);
+      this.draw_tick_at(0.78125, 1);
+      this.draw_tick_at(0.8125, 2);
+      this.draw_tick_at(0.84375, 1);
+      this.draw_tick_at(0.875, 3);
+      this.draw_tick_at(0.90625, 1);
+      this.draw_tick_at(0.9375, 2);
+      this.draw_tick_at(0.96875, 1);
+      return this.draw_tick_at(1.0, 5);
+    };
+
     LERPingSplines.prototype.update_and_draw = function() {
       this.graph_ctx.clearRect(0, 0, this.graph_canvas.width, this.graph_canvas.height);
+      if (this.show_ticks_checkbox.checked) {
+        this.draw_ticks();
+      }
       this.draw_bezier();
       this.update();
       this.draw();

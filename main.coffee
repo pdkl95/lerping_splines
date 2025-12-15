@@ -270,6 +270,9 @@ class LERPingSplines
 
     @reset_loop()
 
+    @show_ticks_checkbox = @find_element('show_ticks')
+    @show_ticks_checkbox.addEventListener('change', @on_show_ticks_checkbox)
+
     @btn_play_pause = @find_element('button_play_pause')
     @btn_play_pause.addEventListener('click',@on_btn_play_pause_click)
 
@@ -425,6 +428,9 @@ class LERPingSplines
     p.enabled = false
     @update_enabled_points()
     p
+
+  on_show_ticks_checkbox: (event, ui) =>
+    @update_and_draw()
 
   on_add_point_btn_click: (event, ui) =>
     @enable_point()
@@ -656,9 +662,7 @@ class LERPingSplines
     for p in @points[0]
       p.draw()
 
-  draw_pen: ->
-    return unless @pen?
-
+  get_normal: ->
     @update_at(@t - @t_step)
     @pen.prev_position.x = @pen.position.x
     @pen.prev_position.y = @pen.position.y
@@ -669,8 +673,14 @@ class LERPingSplines
         x: -(@pen.position.y - @pen.prev_position.y)
         y:  (@pen.position.x - @pen.prev_position.x)
 
-      normal = Vec2.normalize(normal)
+      Vec2.normalize(normal)
+    else
+      null
 
+  draw_pen: ->
+    return unless @pen?
+    normal = @get_normal()
+    if normal?
       arrow       = Vec2.scale(normal, 22.0)
       arrowtip    = Vec2.scale(normal, 15.0)
       arrow_shaft = Vec2.scale(normal, 65.0)
@@ -702,8 +712,69 @@ class LERPingSplines
         ctx.fillStyle = '#000'
         ctx.fillText(@pen_label, plx, ply);
 
+  draw_tick_at: (t, size) ->
+    return unless @pen?
+    t_save = @t
+
+    @t = t
+    normal = @get_normal()
+    if normal?
+      normal = Vec2.scale(normal, 3 + (4.0 * size))
+
+      point_a_x = @pen.position.x + normal.x
+      point_a_y = @pen.position.y + normal.y
+
+      point_b_x = @pen.position.x - normal.x
+      point_b_y = @pen.position.y - normal.y
+
+      ctx = @graph_ctx
+      ctx.beginPath()
+      ctx.moveTo(point_a_x, point_a_y)
+      ctx.lineTo(point_b_x, point_b_y)
+      ctx.strokeStyle = '#000000'
+      ctx.lineWidth = if size > 3 then 2 else 1
+      ctx.stroke()
+
+    @t = t_save
+
+  draw_ticks: ->
+    @draw_tick_at(0.0,     5)
+    @draw_tick_at(0.03125, 1)
+    @draw_tick_at(0.0625,  2)
+    @draw_tick_at(0.09375, 1)
+    @draw_tick_at(0.125,   3)
+    @draw_tick_at(0.15625, 1)
+    @draw_tick_at(0.1875,  2)
+    @draw_tick_at(0.21875, 1)
+    @draw_tick_at(0.25,    4)
+    @draw_tick_at(0.28125, 1)
+    @draw_tick_at(0.3125,  2)
+    @draw_tick_at(0.34375, 1)
+    @draw_tick_at(0.375,   3)
+    @draw_tick_at(0.40625, 1)
+    @draw_tick_at(0.4375,  2)
+    @draw_tick_at(0.46875, 1)
+    @draw_tick_at(0.5,     5)
+    @draw_tick_at(0.53125, 1)
+    @draw_tick_at(0.5625,  2)
+    @draw_tick_at(0.59375, 1)
+    @draw_tick_at(0.625,   3)
+    @draw_tick_at(0.65625, 1)
+    @draw_tick_at(0.6875,  2)
+    @draw_tick_at(0.71875, 1)
+    @draw_tick_at(0.75,    4)
+    @draw_tick_at(0.78125, 1)
+    @draw_tick_at(0.8125,  2)
+    @draw_tick_at(0.84375, 1)
+    @draw_tick_at(0.875,   3)
+    @draw_tick_at(0.90625, 1)
+    @draw_tick_at(0.9375,  2)
+    @draw_tick_at(0.96875, 1)
+    @draw_tick_at(1.0,     5)
+
   update_and_draw: ->
     @graph_ctx.clearRect(0, 0, @graph_canvas.width, @graph_canvas.height)
+    @draw_ticks() if @show_ticks_checkbox.checked
     @draw_bezier()
     @update()
     @draw()

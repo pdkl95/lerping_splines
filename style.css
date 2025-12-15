@@ -209,7 +209,8 @@ button[disabled] {
   padding: 1px 8px;
 }
 
-#points_wrapper {
+/* #points_wrapper { */
+.bbwrapper {
   display: inline-block;
   text-align: left;
   position: relative;
@@ -218,10 +219,11 @@ button[disabled] {
   margin-bottom: 3px;
 }
 
-#points_label,
-#add_point,
-#remove_point,
-#num_points {
+/* #points_label, */
+/* #add_point, */
+/* #remove_point, */
+/* #num_points { */
+.bbwrappeditem {
   display: inline-block;
   margin: 0;
   vertical-align: top;
@@ -229,8 +231,9 @@ button[disabled] {
   height: 24px;
 }
 
-#points_label {
-  margin-right: 0.5rem;
+#points_label,
+#show_ticks_label {
+  margin-right: 0.4rem;
   width: auto;
   padding-top: 3px;
 }
@@ -243,7 +246,7 @@ button[disabled] {
 }
 
 .buttonbox + .buttonbox {
-  margin-left: 1em;
+  margin-left: 0.75rem;
 }
 
 .buttonbox > pre {
