@@ -291,6 +291,7 @@
       this.start = bind(this.start, this);
       this.on_tslide_btn_max_click = bind(this.on_tslide_btn_max_click, this);
       this.on_tslide_btn_min_click = bind(this.on_tslide_btn_min_click, this);
+      this.on_tslider_bg_click = bind(this.on_tslider_bg_click, this);
       this.on_btn_play_pause_click = bind(this.on_btn_play_pause_click, this);
       this.on_remove_point_btn_click = bind(this.on_remove_point_btn_click, this);
       this.on_add_point_btn_click = bind(this.on_add_point_btn_click, this);
@@ -326,6 +327,8 @@
       this.tslider_btn_min.addEventListener('click', this.on_tslide_btn_min_click);
       this.tslider_btn_max = this.find_element('tbox_slider_btn_max');
       this.tslider_btn_max.addEventListener('click', this.on_tslide_btn_max_click);
+      this.tslider_bg = this.find_element('tbox_slider');
+      this.tslider_bg.addEventListener('click', this.on_tslider_bg_click);
       this.tslider = {
         handle: this.find_element('tbox_slider_handle'),
         min: 0,
@@ -555,6 +558,17 @@
       this.tslider.position = x;
       this.tslider.handle.style.left = x + "px";
       return this.set_t((x - this.tslider.min) / this.tslider.range);
+    };
+
+    LERPingSplines.prototype.on_tslider_bg_click = function(event) {
+      var cc, coord_x, slider_pos, t;
+      cc = this.tslider_bg.getBoundingClientRect();
+      coord_x = event.pageX - cc.left;
+      coord_x -= window.scrollX;
+      t = coord_x / cc.width;
+      slider_pos = this.tslider.min + (t * (this.tslider.max - this.tslider.min));
+      this.set_tslider_position(slider_pos);
+      return this.update_and_draw();
     };
 
     LERPingSplines.prototype.on_tslide_btn_min_click = function() {
