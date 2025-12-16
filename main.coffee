@@ -259,6 +259,9 @@ class LERPingSplines
     @tslider_btn_max = @find_element('tbox_slider_btn_max')
     @tslider_btn_max.addEventListener('click', @on_tslide_btn_max_click)
 
+    @tslider_bg = @find_element('tbox_slider')
+    @tslider_bg.addEventListener('click', @on_tslider_bg_click)
+
     @tslider =
       handle: @find_element('tbox_slider_handle')
       min: 0
@@ -453,6 +456,15 @@ class LERPingSplines
     @tslider.position = x
     @tslider.handle.style.left = "#{x}px"
     @set_t( (x - @tslider.min) / @tslider.range )
+
+  on_tslider_bg_click: (event) =>
+    cc = @tslider_bg.getBoundingClientRect()
+    coord_x = event.pageX - cc.left
+    coord_x -= window.scrollX
+    t = coord_x / cc.width
+    slider_pos = @tslider.min + (t * (@tslider.max - @tslider.min))
+    @set_tslider_position(slider_pos)
+    @update_and_draw()
 
   on_tslide_btn_min_click: =>
     @set_tslider_position(@tslider.min)
