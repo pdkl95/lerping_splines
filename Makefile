@@ -6,17 +6,20 @@ builddir   ?= $(top_srcdir)
 # config
 #
 
-COFFEE ?= coffee
-COFFEE_OPTIONS ?= --no-header --compile
+PROJECT = lerping_splines
 
+COFFEE ?= coffee --no-header --compile
 RM ?= rm -f
 
 #
 # build deps
 #
 
-COFFEE_SRC = $(wildcard $(srcdir)/*.coffee)
-JS_TARGETS = $(patsubst $(srcdir)/%.coffee,$(builddir)/%.js,$(COFFEE_SRC))
+PROJECT_COFFEE_SRC = \
+	math.coffee  \
+	main.coffee
+
+JS_TARGETS = $(PROJECT).js
 
 TARGETS = $(JS_TARGETS)
 
@@ -26,8 +29,8 @@ TARGETS = $(JS_TARGETS)
 all: build
 build: $(TARGETS)
 
-$(builddir)/%.js: $(srcdir)/%.coffee
-	$(COFFEE) $(COFFEE_OPTIONS) $< > $@
+$(PROJECT).js: $(PROJECT_COFFEE_SRC)
+	cat $^ | $(COFFEE) --stdio > $@
 
 clean:
 	$(RM) $(TARGETS)
