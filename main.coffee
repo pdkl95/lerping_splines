@@ -48,12 +48,34 @@ class Point
     @position.x = @x
     @position.y = @y
 
-    if @position.x < (APP.graph_width / 2.0)
+    ###################
+    # X
+
+    @x_is_left = true
+
+    if (@position.x > (APP.graph_width / 2.0)) and (@position.x < APP.point_label_flip_margin.max_x)
+      @x_is_left = false
+
+    if @position.x <= APP.point_label_flip_margin.min_x
+      @x_is_left = false
+
+    if @x_is_left
       @label_position.x = @position.x - @label_width - 13
     else
       @label_position.x = @position.x + @label_width - 1
 
-    if @position.y < (APP.graph_height / 2.0)
+    ###################
+    # Y
+
+    @y_is_top = true
+
+    if (@position.y > (APP.graph_height / 2.0)) and (@position.y < APP.point_label_flip_margin.max_y)
+      @y_is_top = false
+
+    if @position.y <= APP.point_label_flip_margin.min_y
+      @y_is_top = false
+
+    if @y_is_top
       @label_position.y = @position.y - @label_height + 2
     else
       @label_position.y = @position.y + @label_height + 8
@@ -173,7 +195,8 @@ class LERPingSplines
   @create_point_margin: 0.12
 
   @point_radius: 5
-  @point_move_margin: 3
+  @point_move_margin: 24
+  @point_label_flip_margin: 32
 
   @point_labels: "ABCDEFGHIJKLM"
   @point_label_height: 22
@@ -211,6 +234,12 @@ class LERPingSplines
       min_y: LERPingSplines.point_move_margin
       max_x: @graph_width  - LERPingSplines.point_move_margin
       max_y: @graph_height - LERPingSplines.point_move_margin
+
+    @point_label_flip_margin =
+      min_x: LERPingSplines.point_label_flip_margin
+      min_y: LERPingSplines.point_label_flip_margin
+      max_x: @graph_width  - LERPingSplines.point_label_flip_margin
+      max_y: @graph_height - LERPingSplines.point_label_flip_margin
 
     @points = []
     @enabled_points = 0

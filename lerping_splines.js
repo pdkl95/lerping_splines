@@ -310,12 +310,26 @@ class Matrix {
     Point.prototype.update = function(t) {
       this.position.x = this.x;
       this.position.y = this.y;
-      if (this.position.x < (APP.graph_width / 2.0)) {
+      this.x_is_left = true;
+      if ((this.position.x > (APP.graph_width / 2.0)) && (this.position.x < APP.point_label_flip_margin.max_x)) {
+        this.x_is_left = false;
+      }
+      if (this.position.x <= APP.point_label_flip_margin.min_x) {
+        this.x_is_left = false;
+      }
+      if (this.x_is_left) {
         this.label_position.x = this.position.x - this.label_width - 13;
       } else {
         this.label_position.x = this.position.x + this.label_width - 1;
       }
-      if (this.position.y < (APP.graph_height / 2.0)) {
+      this.y_is_top = true;
+      if ((this.position.y > (APP.graph_height / 2.0)) && (this.position.y < APP.point_label_flip_margin.max_y)) {
+        this.y_is_top = false;
+      }
+      if (this.position.y <= APP.point_label_flip_margin.min_y) {
+        this.y_is_top = false;
+      }
+      if (this.y_is_top) {
         return this.label_position.y = this.position.y - this.label_height + 2;
       } else {
         return this.label_position.y = this.position.y + this.label_height + 8;
@@ -459,7 +473,9 @@ class Matrix {
 
     LERPingSplines.point_radius = 5;
 
-    LERPingSplines.point_move_margin = 3;
+    LERPingSplines.point_move_margin = 24;
+
+    LERPingSplines.point_label_flip_margin = 32;
 
     LERPingSplines.point_labels = "ABCDEFGHIJKLM";
 
@@ -519,6 +535,12 @@ class Matrix {
         min_y: LERPingSplines.point_move_margin,
         max_x: this.graph_width - LERPingSplines.point_move_margin,
         max_y: this.graph_height - LERPingSplines.point_move_margin
+      };
+      this.point_label_flip_margin = {
+        min_x: LERPingSplines.point_label_flip_margin,
+        min_y: LERPingSplines.point_label_flip_margin,
+        max_x: this.graph_width - LERPingSplines.point_label_flip_margin,
+        max_y: this.graph_height - LERPingSplines.point_label_flip_margin
       };
       this.points = [];
       this.enabled_points = 0;
