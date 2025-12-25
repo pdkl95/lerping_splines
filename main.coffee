@@ -138,10 +138,10 @@ class LERP extends Point
     @alg_label = "temp_#{order}_#{index}"
 
   get_label: ->
-    if APP.option.alt_algorithm_names
-      @alg_label
-    else
+    if APP.option.alt_algorithm_names.value
       @label
+    else
+      @alg_label
 
   interpolate: (t, a, b) ->
     (t * b) + ((1 - t) * a)
@@ -241,6 +241,15 @@ class LERPingSplines
       rebalance_points_on_order_up:    new UI.BoolOption('rebalance_points_on_order_up', false)
       rebalance_points_on_order_down:  new UI.BoolOption('rebalance_points_on_order_down', false)
       show_tooltips:                   new UI.BoolOption('show_tooltips', true)
+
+    @option.show_ticks.register_callback
+      on_change: @on_show_ticks_change
+ 
+    @option.show_pen_label.register_callback
+      on_change: @on_pen_label_change
+
+    @option.alt_algorithm_names.register_callback
+      on_change: @on_alt_algorithm_names_change
 
     @option.show_algorithm.register_callback
       on_true:  @on_show_algorithm_true
@@ -567,8 +576,14 @@ class LERPingSplines
     else
       @content_el.classList.remove('show_tt')
 
-  on_show_ticks_checkbox: (event, ui) =>
+  on_show_ticks_change: =>
     @update_and_draw()
+
+  on_pen_label_change: =>
+    @update_and_draw()
+
+  on_alt_algorithm_names_change: =>
+    @update_algorithm()
 
   on_add_point_btn_click: (event, ui) =>
     @enable_point(true)
@@ -653,10 +668,41 @@ class LERPingSplines
 
         label = if p is @pen then @pen_label else p.get_label()
 
-        if order > 0
-          lines.push "#{label} = Lerp(#{p.from.get_label()}, #{p.to.get_label()}, t)"
+        if@option.alt_algorithm_names.value
+          # alt
+          switch order
+            when 0
+              lines.push "#{label} = <#{parseInt(p.position.x, 10)}, #{parseInt(p.position.y, 10)}>"
+
+            when 6
+              if label.length < 4
+                lines.push "#{label} = Lerp(#{p.from.get_label()}, #{p.to.get_label()}, t)"
+
+              else
+                lines.push "#{label} ="
+                lines.push "    Lerp(#{p.from.get_label()},"
+                lines.push "         #{p.to.get_label()}, t)"
+
+            when 7
+              if label.length < 4
+                lines.push "#{label} = Lerp(#{p.from.get_label()},"
+              else
+                lines.push "#{label} ="
+                lines.push "    Lerp(#{p.from.get_label()},"
+
+              lines.push "         #{p.to.get_label()},"
+              lines.push "         t)"
+
+            else
+              lines.push "#{label} = Lerp(#{p.from.get_label()}, #{p.to.get_label()}, t)"
+
         else
-          lines.push "#{label} = <#{parseInt(p.position.x, 10)}, #{parseInt(p.position.y, 10)}>"
+          # normal
+          if order > 0
+            lines.push "#{label} = Lerp(#{p.from.get_label()}, #{p.to.get_label()}, t)"
+          else
+            lines.push "#{label} = <#{parseInt(p.position.x, 10)}, #{parseInt(p.position.y, 10)}>"
+
 
     @algorithm_text.innerText = lines.join("\n")
 
@@ -853,12 +899,11 @@ class LERPingSplines
       ctx.lineCap = "round"
       ctx.stroke()
 
-      if @option.show_pen_label.value
-        plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), @pen_label_offset_length + 3)
-        plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - @pen_label_offset.x
-        ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - @pen_label_offset.y + @pen_label_height
-        ctx.fillStyle = '#000'
-        ctx.fillText(@pen_label, plx, ply);
+      plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), @pen_label_offset_length + 3)
+      plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - @pen_label_offset.x
+      ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - @pen_label_offset.y + @pen_label_height
+      ctx.fillStyle = '#000'
+      ctx.fillText(@pen_label, plx, ply);
 
   draw_tick_at: (t, size) ->
     return unless @pen?
@@ -926,7 +971,7 @@ class LERPingSplines
     @draw_bezier()
     @update()
     @draw()
-    @draw_pen()
+    @draw_pen() if @option.show_pen_label.value
 
   update_callback: (timestamp) =>
     @frame_is_scheduled = false

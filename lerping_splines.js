@@ -913,10 +913,10 @@ class Matrix {
     };
 
     LERP.prototype.get_label = function() {
-      if (APP.option.alt_algorithm_names) {
-        return this.alg_label;
-      } else {
+      if (APP.option.alt_algorithm_names.value) {
         return this.label;
+      } else {
+        return this.alg_label;
       }
     };
 
@@ -1038,7 +1038,9 @@ class Matrix {
       this.on_btn_play_pause_click = bind(this.on_btn_play_pause_click, this);
       this.on_remove_point_btn_click = bind(this.on_remove_point_btn_click, this);
       this.on_add_point_btn_click = bind(this.on_add_point_btn_click, this);
-      this.on_show_ticks_checkbox = bind(this.on_show_ticks_checkbox, this);
+      this.on_alt_algorithm_names_change = bind(this.on_alt_algorithm_names_change, this);
+      this.on_pen_label_change = bind(this.on_pen_label_change, this);
+      this.on_show_ticks_change = bind(this.on_show_ticks_change, this);
       this.on_show_tooltips_change = bind(this.on_show_tooltips_change, this);
     }
 
@@ -1059,6 +1061,15 @@ class Matrix {
         rebalance_points_on_order_down: new UI.BoolOption('rebalance_points_on_order_down', false),
         show_tooltips: new UI.BoolOption('show_tooltips', true)
       };
+      this.option.show_ticks.register_callback({
+        on_change: this.on_show_ticks_change
+      });
+      this.option.show_pen_label.register_callback({
+        on_change: this.on_pen_label_change
+      });
+      this.option.alt_algorithm_names.register_callback({
+        on_change: this.on_alt_algorithm_names_change
+      });
       this.option.show_algorithm.register_callback({
         on_true: this.on_show_algorithm_true,
         on_false: this.on_show_algorithm_false
@@ -1416,8 +1427,16 @@ class Matrix {
       }
     };
 
-    LERPingSplines.prototype.on_show_ticks_checkbox = function(event, ui) {
+    LERPingSplines.prototype.on_show_ticks_change = function() {
       return this.update_and_draw();
+    };
+
+    LERPingSplines.prototype.on_pen_label_change = function() {
+      return this.update_and_draw();
+    };
+
+    LERPingSplines.prototype.on_alt_algorithm_names_change = function() {
+      return this.update_algorithm();
     };
 
     LERPingSplines.prototype.on_add_point_btn_click = function(event, ui) {
@@ -1524,10 +1543,39 @@ class Matrix {
             continue;
           }
           label = p === this.pen ? this.pen_label : p.get_label();
-          if (order > 0) {
-            lines.push(label + " = Lerp(" + (p.from.get_label()) + ", " + (p.to.get_label()) + ", t)");
+          if (this.option.alt_algorithm_names.value) {
+            switch (order) {
+              case 0:
+                lines.push(label + " = <" + (parseInt(p.position.x, 10)) + ", " + (parseInt(p.position.y, 10)) + ">");
+                break;
+              case 6:
+                if (label.length < 4) {
+                  lines.push(label + " = Lerp(" + (p.from.get_label()) + ", " + (p.to.get_label()) + ", t)");
+                } else {
+                  lines.push(label + " =");
+                  lines.push("    Lerp(" + (p.from.get_label()) + ",");
+                  lines.push("         " + (p.to.get_label()) + ", t)");
+                }
+                break;
+              case 7:
+                if (label.length < 4) {
+                  lines.push(label + " = Lerp(" + (p.from.get_label()) + ",");
+                } else {
+                  lines.push(label + " =");
+                  lines.push("    Lerp(" + (p.from.get_label()) + ",");
+                }
+                lines.push("         " + (p.to.get_label()) + ",");
+                lines.push("         t)");
+                break;
+              default:
+                lines.push(label + " = Lerp(" + (p.from.get_label()) + ", " + (p.to.get_label()) + ", t)");
+            }
           } else {
-            lines.push(label + " = <" + (parseInt(p.position.x, 10)) + ", " + (parseInt(p.position.y, 10)) + ">");
+            if (order > 0) {
+              lines.push(label + " = Lerp(" + (p.from.get_label()) + ", " + (p.to.get_label()) + ", t)");
+            } else {
+              lines.push(label + " = <" + (parseInt(p.position.x, 10)) + ", " + (parseInt(p.position.y, 10)) + ">");
+            }
           }
         }
       }
@@ -1822,13 +1870,11 @@ class Matrix {
         ctx.lineWidth = 2;
         ctx.lineCap = "round";
         ctx.stroke();
-        if (this.option.show_pen_label.value) {
-          plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), this.pen_label_offset_length + 3);
-          plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - this.pen_label_offset.x;
-          ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - this.pen_label_offset.y + this.pen_label_height;
-          ctx.fillStyle = '#000';
-          return ctx.fillText(this.pen_label, plx, ply);
-        }
+        plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), this.pen_label_offset_length + 3);
+        plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - this.pen_label_offset.x;
+        ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - this.pen_label_offset.y + this.pen_label_height;
+        ctx.fillStyle = '#000';
+        return ctx.fillText(this.pen_label, plx, ply);
       }
     };
 
@@ -1901,7 +1947,9 @@ class Matrix {
       this.draw_bezier();
       this.update();
       this.draw();
-      return this.draw_pen();
+      if (this.option.show_pen_label.value) {
+        return this.draw_pen();
+      }
     };
 
     LERPingSplines.prototype.update_callback = function(timestamp) {
