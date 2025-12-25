@@ -12,6 +12,7 @@ class Point
     @order = 0
     @radius = LERPingSplines.point_radius
     @color ?= '#000'
+    @label_color ?= '#000'
 
     @position =
       x: x
@@ -101,7 +102,7 @@ class Point
     ctx.fill()
 
     if @label
-      ctx.fillStyle = '#000'
+      ctx.fillStyle = @label_color
       ctx.fillText(@label, @label_position.x, @label_position.y);
 
 
@@ -112,7 +113,7 @@ class LERP extends Point
     @radius = 5
 
     @color = switch @order
-      when 1 then '#000'
+      when 1 then '#451C92'
       when 2 then '#2D42DC'
       when 3 then '#A243DC'
       when 4 then '#D44143'
@@ -137,7 +138,7 @@ class LERP extends Point
     @alg_label = "temp_#{order}_#{index}"
 
   get_label: ->
-    if APP.alt_algorithm_names
+    if APP.option.alt_algorithm_names
       @alg_label
     else
       @label
@@ -184,6 +185,18 @@ class LERP extends Point
       ctx.arc(@position.x, @position.y, @radius + 1, 0, TAU);
       ctx.stroke()
 
+  update_order_0_point_label_color: ->
+    rgb = Color.hex2rgb(@color);
+    hsv = Color.rgb2hsv(rgb[0], rgb[1], rgb[2]);
+    hsv[0] += 0.7
+    hsv[0] -= 1.0 if hsv[0] > 1.0
+    hsv[1] *= 0.5
+    hsv[2] *= 0.55
+    rgb = Color.hsv2rgb(hsv[0], hsv[1], hsv[2]);
+    color = Color.rgbarr2hex(rgb)
+
+    for p in APP.points[0]
+      p.label_color = color
 
 class LERPingSplines
   @min_points: 2
@@ -211,9 +224,13 @@ class LERPingSplines
     console.log('Starting init()...')
 
     @running = false
-    @pen_label_enabled = true
-    @algorithm_enabled = true
-    @alt_algorithm_names = true
+
+    @option =
+      pen_label_enabled: true
+      algorithm_enabled: true
+      alt_algorithm_names: true
+      rebalance_points_on_order_up: false
+      rebalance_points_on_order_down: false
 
     @content_el       = @context.getElementById('content')
 
@@ -303,27 +320,39 @@ class LERPingSplines
     @update()
     @stop()
 
-    if @algorithm_enabled
+    if @option.algorithm_enabled
       @show_algorithm()
     else
       @hide_algorithm()
+
+    #@debug("Ready!")
 
   debug: (msg_text) ->
     unless @debugbox?
       @debugbox = @context.getElementById('debugbox')
       @debugbox.classList.remove('hidden')
 
-    hdr = $('<span/>',  class: 'hdr')
-    msg = $('<span/>',  class: 'msg')
+    hdr = @create_element('span', class: ['hdr'])
+    msg = @create_element('span', class: ['msg'])
 
     timestamp = new Date()
-    hdr.text(timestamp.toISOString())
-    msg.text('' + msg_text)
+    hdr.textContent = timestamp.toISOString()
+    msg.textContent = '' + msg_text
 
-    line = $('<div/>', class: "dbg_line").append([ hdr, msg ])
-    @debugbox.append(line)
+    line = @create_element('div', class: ['dbg_line'])
+    line.appendChild(hdr)
+    line.appendChild(msg)
+    @debugbox.appendChild(line)
 
-    @debugbox.animate({ scrollTop: @debugbox.prop("scrollHeight")}, 600);
+    #@debugbox.animate({ scrollTop: @debugbox.prop("scrollHeight")}, 600);
+    #@debugbox.scrollTop = @debugbox.scrollHeight
+
+  create_element: (tag_name, opt = {}) ->
+    el = @context.createElement(tag_name)
+    if opt['class']?
+      for klass in opt['class']
+        el.classList.add(klass)
+    el
 
   find_element: (id) ->
     el = @context.getElementById(id)
@@ -361,10 +390,10 @@ class LERPingSplines
         @points[order][j] = lerp
         @points[order][j].generate_label(order, j)
 
-    @enable_point_at( 0.06, 0.85 )
-    @enable_point_at( 0.15, 0.08 )
+    @enable_point_at( 0.06, 0.82 )
+    #@enable_point_at( 0.15, 0.08 )
     @enable_point_at( 0.72, 0.18 )
-    @enable_point_at( 0.88, 0.90 )
+    #@enable_point_at( 0.88, 0.90 )
 
     @update_enabled_points()
 
@@ -398,6 +427,7 @@ class LERPingSplines
         break
     if p?
       @pen = p
+      @pen.update_order_0_point_label_color()
     else
       @debug("ERROR: no pen?!")
 
@@ -407,7 +437,7 @@ class LERPingSplines
     return if @enabled_points >= LERPingSplines.max_points
     p = @points[0][@enabled_points]
 
-    if rebalance_points
+    if rebalance_points and @option.rebalance_points_on_order_up
       cur_id = @enabled_points
       prev_id = cur_id - 1
       while prev_id >= 0
@@ -498,7 +528,7 @@ class LERPingSplines
   disable_point: ->
     return if @enabled_points <= LERPingSplines.min_points
 
-    if @enabled_points > 3
+    if @enabled_points > 3 and @option.rebalance_points_on_order_down
       @compute_lower_order_curve()
 
     @enabled_points -= 1
@@ -597,12 +627,12 @@ class LERPingSplines
     @algorithm_text.innerText = lines.join("\n")
 
   show_algorithm: =>
-    @algorithm_enabled = true
+    @option.algorithm_enabled = true
     @algorithmbox.classList.remove('hidden')
     @update_algorithm()
 
   hide_algorithm: =>
-    @algorithm_enabled = false
+    @option.algorithm_enabled = false
     @algorithmbox.classList.add('hidden')
 
   clamp_to_canvas: (v) ->
@@ -680,7 +710,7 @@ class LERPingSplines
       for p in order
         p.selected = false
 
-    if @point_has_changed and @algorithm_enabled
+    if @point_has_changed and @option.algorithm_enabled
       @update_algorithm()
 
   on_mouseup: (event) =>
@@ -791,7 +821,7 @@ class LERPingSplines
       ctx.lineCap = "round"
       ctx.stroke()
 
-      if @pen_label_enabled
+      if @option.pen_label_enabled
         plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), @pen_label_offset_length + 3)
         plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - @pen_label_offset.x
         ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - @pen_label_offset.y + @pen_label_height

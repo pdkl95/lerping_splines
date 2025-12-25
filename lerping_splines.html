@@ -50,17 +50,28 @@
       </div>
     </div>
 
-    <div id="debugbox" class="hidden clear_both"></div>
+    <div id="debugbox" class="hidden clear_both canvas_width"></div>
 
-    <div id="algorithmbox" class="hidden clear_both canvas_width">
-      <h2>Algorithm</h2>
-      <h4>Lerp: Linear Intrpolaton</h4>
-      <pre>function Lerp(vector1, vector2, t) {
+    <div id="alg_opt_box" class="clear_both canvas_width tabbox_wrapper">
+      <input type="radio" name="alg_opt_tabs" id="alg_opt_tabs_algorithm_input" checked>
+      <label class="tab" for="alg_opt_tabs_algorithm_input"><h2>Algorithm</h2></label>
+      <input type="radio" name="alg_opt_tabs" id="alg_opt_tabs_options_input">
+      <label class="tab" for="alg_opt_tabs_options_input"><h2>Options</h2></label>
+
+      <div id="alg_opt_tabbox-algorithm" class="tabcontent">
+        <div id="algorithmbox">
+          <h4>Lerp: Linear Intrpolaton</h4>
+          <pre>function Lerp(vector1, vector2, t) {
     return ((1-t) * vector1) +
            (   t  * vector2)
 }</pre>
-      <h4>It's Lerp All The Way Down</h4>
-      <pre id="algorithm_text"></pre>
+          <h4>It's Lerp All The Way Down</h4>
+          <pre id="algorithm_text"></pre>
+        </div>
+      </div>
+
+      <div id="alg_opt_tabbox-options" class="tabcontent">
+      </div>
     </div>
 
     <div class="clear_both"></div>

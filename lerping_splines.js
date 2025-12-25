@@ -1,8 +1,91 @@
 (function() {
-  var APP, LERP, LERPingSplines, Point, TAU, Vec2, clone,
+  var APP, Color, LERP, LERPingSplines, Point, TAU, Vec2, clone,
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
+
+  Color = (function() {
+    function Color() {}
+
+    Color.hex2rgb = function(h) {
+      var arr, l, len, results, value;
+      arr = h.length === 4 ? [h[1] + h[1], h[2] + h[2], h[3] + h[3]] : h.length === 7 ? [h[1] + h[2], h[3] + h[4], h[5] + h[6]] : raise("string '" + h + "' is not in '#RGB' or '#RRGGBB' format");
+      results = [];
+      for (l = 0, len = arr.length; l < len; l++) {
+        value = arr[l];
+        results.push(parseInt(value, 16) / 255);
+      }
+      return results;
+    };
+
+    Color.rgb2hex = function(r, g, b) {
+      return Color.rgbarr2hex([r, g, b]);
+    };
+
+    Color.rgbarr2hex = function(arr) {
+      var value;
+      return "#" + ((function() {
+        var l, len, results;
+        results = [];
+        for (l = 0, len = arr.length; l < len; l++) {
+          value = arr[l];
+          results.push(parseInt(255 * value, 10).toString(16).padStart(2, '0'));
+        }
+        return results;
+      })()).join('');
+    };
+
+    Color.rgb2hsv = function(r, g, b) {
+      var d, h, max, min, s, v;
+      max = Math.max(r, g, b);
+      min = Math.min(r, g, b);
+      v = max;
+      d = max - min;
+      s = (max === 0 ? 0 : d / max);
+      if (max === min) {
+        h = 0;
+      } else {
+        h = (function() {
+          switch (max) {
+            case r:
+              return (g - b) / d + (g < b ? 6 : 0);
+            case g:
+              return (b - r) / d + 2;
+            case b:
+              return (r - g) / d + 4;
+          }
+        })();
+        h /= 6;
+      }
+      return [h, s, v];
+    };
+
+    Color.hsv2rgb = function(h, s, v) {
+      var f, i, p, q, t;
+      i = Math.floor(h * 6);
+      f = h * 6 - i;
+      p = v * (1 - s);
+      q = v * (1 - f * s);
+      t = v * (1 - (1 - f) * s);
+      switch (i % 6) {
+        case 0:
+          return [v, t, p];
+        case 1:
+          return [q, v, p];
+        case 2:
+          return [p, v, t];
+        case 3:
+          return [p, q, v];
+        case 4:
+          return [t, p, v];
+        case 5:
+          return [v, p, q];
+      }
+    };
+
+    return Color;
+
+  })();
 
   clone = function(obj) {
     var flags, key, newInstance;
@@ -260,8 +343,8 @@ class Matrix {
   TAU = 2 * Math.PI;
 
   Point = (function() {
-    function Point(x, y, color) {
-      this.color = color;
+    function Point(x, y, color1) {
+      this.color = color1;
       this.enabled = false;
       this.hover = false;
       this.selected = false;
@@ -269,6 +352,9 @@ class Matrix {
       this.radius = LERPingSplines.point_radius;
       if (this.color == null) {
         this.color = '#000';
+      }
+      if (this.label_color == null) {
+        this.label_color = '#000';
       }
       this.position = {
         x: x,
@@ -356,7 +442,7 @@ class Matrix {
       ctx.arc(this.x, this.y, this.radius, 0, TAU);
       ctx.fill();
       if (this.label) {
-        ctx.fillStyle = '#000';
+        ctx.fillStyle = this.label_color;
         return ctx.fillText(this.label, this.label_position.x, this.label_position.y);
       }
     };
@@ -377,7 +463,7 @@ class Matrix {
       this.color = (function() {
         switch (this.order) {
           case 1:
-            return '#000';
+            return '#451C92';
           case 2:
             return '#2D42DC';
           case 3:
@@ -410,7 +496,7 @@ class Matrix {
     };
 
     LERP.prototype.get_label = function() {
-      if (APP.alt_algorithm_names) {
+      if (APP.option.alt_algorithm_names) {
         return this.alg_label;
       } else {
         return this.label;
@@ -454,6 +540,27 @@ class Matrix {
         ctx.arc(this.position.x, this.position.y, this.radius + 1, 0, TAU);
         return ctx.stroke();
       }
+    };
+
+    LERP.prototype.update_order_0_point_label_color = function() {
+      var color, hsv, l, len, p, ref, results, rgb;
+      rgb = Color.hex2rgb(this.color);
+      hsv = Color.rgb2hsv(rgb[0], rgb[1], rgb[2]);
+      hsv[0] += 0.7;
+      if (hsv[0] > 1.0) {
+        hsv[0] -= 1.0;
+      }
+      hsv[1] *= 0.5;
+      hsv[2] *= 0.55;
+      rgb = Color.hsv2rgb(hsv[0], hsv[1], hsv[2]);
+      color = Color.rgbarr2hex(rgb);
+      ref = APP.points[0];
+      results = [];
+      for (l = 0, len = ref.length; l < len; l++) {
+        p = ref[l];
+        results.push(p.label_color = color);
+      }
+      return results;
     };
 
     return LERP;
@@ -519,9 +626,13 @@ class Matrix {
       var ref, ref1;
       console.log('Starting init()...');
       this.running = false;
-      this.pen_label_enabled = true;
-      this.algorithm_enabled = true;
-      this.alt_algorithm_names = true;
+      this.option = {
+        pen_label_enabled: true,
+        algorithm_enabled: true,
+        alt_algorithm_names: true,
+        rebalance_points_on_order_up: false,
+        rebalance_points_on_order_down: false
+      };
       this.content_el = this.context.getElementById('content');
       this.graph_wrapper = this.find_element('graph_wrapper');
       this.graph_canvas = this.find_element('graph');
@@ -593,7 +704,7 @@ class Matrix {
       this.add_initial_points();
       this.update();
       this.stop();
-      if (this.algorithm_enabled) {
+      if (this.option.algorithm_enabled) {
         return this.show_algorithm();
       } else {
         return this.hide_algorithm();
@@ -606,22 +717,37 @@ class Matrix {
         this.debugbox = this.context.getElementById('debugbox');
         this.debugbox.classList.remove('hidden');
       }
-      hdr = $('<span/>', {
-        "class": 'hdr'
+      hdr = this.create_element('span', {
+        "class": ['hdr']
       });
-      msg = $('<span/>', {
-        "class": 'msg'
+      msg = this.create_element('span', {
+        "class": ['msg']
       });
       timestamp = new Date();
-      hdr.text(timestamp.toISOString());
-      msg.text('' + msg_text);
-      line = $('<div/>', {
-        "class": "dbg_line"
-      }).append([hdr, msg]);
-      this.debugbox.append(line);
-      return this.debugbox.animate({
-        scrollTop: this.debugbox.prop("scrollHeight")
-      }, 600);
+      hdr.textContent = timestamp.toISOString();
+      msg.textContent = '' + msg_text;
+      line = this.create_element('div', {
+        "class": ['dbg_line']
+      });
+      line.appendChild(hdr);
+      line.appendChild(msg);
+      return this.debugbox.appendChild(line);
+    };
+
+    LERPingSplines.prototype.create_element = function(tag_name, opt) {
+      var el, klass, l, len, ref;
+      if (opt == null) {
+        opt = {};
+      }
+      el = this.context.createElement(tag_name);
+      if (opt['class'] != null) {
+        ref = opt['class'];
+        for (l = 0, len = ref.length; l < len; l++) {
+          klass = ref[l];
+          el.classList.add(klass);
+        }
+      }
+      return el;
     };
 
     LERPingSplines.prototype.find_element = function(id) {
@@ -668,10 +794,8 @@ class Matrix {
           this.points[order][j].generate_label(order, j);
         }
       }
-      this.enable_point_at(0.06, 0.85);
-      this.enable_point_at(0.15, 0.08);
+      this.enable_point_at(0.06, 0.82);
       this.enable_point_at(0.72, 0.18);
-      this.enable_point_at(0.88, 0.90);
       this.update_enabled_points();
       return console.log('Initial points created!');
     };
@@ -711,6 +835,7 @@ class Matrix {
       }
       if (p != null) {
         this.pen = p;
+        this.pen.update_order_0_point_label_color();
       } else {
         this.debug("ERROR: no pen?!");
       }
@@ -723,7 +848,7 @@ class Matrix {
         return;
       }
       p = this.points[0][this.enabled_points];
-      if (rebalance_points) {
+      if (rebalance_points && this.option.rebalance_points_on_order_up) {
         cur_id = this.enabled_points;
         prev_id = cur_id - 1;
         while (prev_id >= 0) {
@@ -821,7 +946,7 @@ class Matrix {
       if (this.enabled_points <= LERPingSplines.min_points) {
         return;
       }
-      if (this.enabled_points > 3) {
+      if (this.enabled_points > 3 && this.option.rebalance_points_on_order_down) {
         this.compute_lower_order_curve();
       }
       this.enabled_points -= 1;
@@ -946,13 +1071,13 @@ class Matrix {
     };
 
     LERPingSplines.prototype.show_algorithm = function() {
-      this.algorithm_enabled = true;
+      this.option.algorithm_enabled = true;
       this.algorithmbox.classList.remove('hidden');
       return this.update_algorithm();
     };
 
     LERPingSplines.prototype.hide_algorithm = function() {
-      this.algorithm_enabled = false;
+      this.option.algorithm_enabled = false;
       return this.algorithmbox.classList.add('hidden');
     };
 
@@ -1076,7 +1201,7 @@ class Matrix {
           p.selected = false;
         }
       }
-      if (this.point_has_changed && this.algorithm_enabled) {
+      if (this.point_has_changed && this.option.algorithm_enabled) {
         return this.update_algorithm();
       }
     };
@@ -1235,7 +1360,7 @@ class Matrix {
         ctx.lineWidth = 2;
         ctx.lineCap = "round";
         ctx.stroke();
-        if (this.pen_label_enabled) {
+        if (this.option.pen_label_enabled) {
           plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), this.pen_label_offset_length + 3);
           plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - this.pen_label_offset.x;
           ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - this.pen_label_offset.y + this.pen_label_height;

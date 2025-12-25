@@ -332,6 +332,89 @@ button[disabled] {
   background-color: #F9FBB6;
 }
 
+.tabbox_wrapper {
+  margin-top: 0.5rem;
+}
+
+.tabbox_wrapper > [type="radio"] {
+  display: none;
+}
+
+[id^="alg_opt_tabbox"] {
+  display: none;
+}
+
+.tabbox_wrapper > .tab > h2 {
+  margin-bottom: 0;
+  margin-top: 0;
+  border-bottom: 0;
+}
+
+.tabbox_wrapper > .tab {
+  display: block;
+  float: left;
+  background-color: #aaa;
+  padding-left: 5px;
+  padding-right: 5px;
+  padding-top: 2px;
+  padding-bottom: 4px;
+  border-top: 1px dashed #999;
+  border-left: 1px dashed #999;
+  border-right: 1px dashed #999;
+  margin-left: 0.3rem;
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+}
+
+.tabbox_wrapper > .tab:first-of-type {
+  margin-left: 0.666rem;
+}
+
+.tabbox_wrapper > .tab:hover {
+  background-color: #ddd;
+  border-top-style: solid;
+  border-left-style: solid;
+  border-right-style: solid;
+}
+
+#alg_opt_tabs_algorithm_input:checked + .tab,
+#alg_opt_tabs_options_input:checked + .tab {
+  background-color: #ccc;
+  border-top-style: inset;
+  border-left-style: inset;
+  border-right-style: inset;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+#alg_opt_tabs_algorithm_input:checked:hover + .tab,
+#alg_opt_tabs_options_input:checked:hover + .tab {
+  background-color: #ccc;
+  border-top-style: inset;
+  border-left-style: inset;
+  border-right-style: inset;
+}
+
+#alg_opt_tabs_algorithm_input:checked ~ #alg_opt_tabbox-algorithm,
+#alg_opt_tabs_options_input:checked ~ #alg_opt_tabbox-options {
+  display: block;
+}
+
+.tabbox_wrapper > .tabcontent {
+  clear: left;
+  padding: 0.5rem;
+  background-color: #ccc;
+  border-left: 1px inset #999;
+  border-right: 1px inset #999;
+  border-radius: 5px;
+}
+
+.tabbox_wrapper > .tabcontent h4 {
+  margin-top: 0;
+  padding-left: 2px;
+  padding-bottom: 0.1rem;
+}
+
 #algorithmbox > pre {
   margin-left: 0;
   margin-right: 0;
