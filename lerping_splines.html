@@ -43,10 +43,6 @@
         <div class="pointsbox buttonbox bbright">
           <div id="points_wrapper" class="bbwrapper"><label id="points_label" for="num_points" class="bbwrappeditem">Points</label><button id="remove_point" class="btn bbwrappeditem">&#x2796;</button><div name="num_points" id="num_points" class="bbwrappeditem">4</div><button id="add_point" class="btn bbwrappeditem">&#x2795;</button></div>
         </div>
-
-        <div class="optbox buttonbox bbright">
-          <div id="show_ticks_wrapper" class="bbwrapper"><label for="show_ticks" id="show_ticks_label" class="bbwrappeditem">Tick Marks</label><input type="checkbox" name="show_ticks" id="show_ticks" class="bbwrappeditem"></input></div>
-        </div>
       </div>
     </div>
 
@@ -71,6 +67,50 @@
       </div>
 
       <div id="alg_opt_tabbox-options" class="tabcontent">
+        <table>
+          <tr>
+            <th class="tt ttright" data-title="">Show Ticks</th>
+            <td>
+              <input id="show_ticks" type="checkbox" checked="checked" autocomplete="off">
+            </td>
+          </tr>
+          <tr>
+            <th class="tt ttright" data-title="The arrow labeled \"P\"">Show pen label</th>
+            <td>
+              <input id="show_pen_label" type="checkbox" checked="checked" autocomplete="off">
+            </td>
+          </tr>
+          <tr>
+            <th class="tt ttright" data-title="">Show Algorithm</th>
+            <td>
+              <input id="show_algorithm" type="checkbox" checked="checked" autocomplete="off">
+            </td>
+          </tr>
+          <tr>
+            <th class="tt ttright" data-title="">Alt algorithm names</th>
+            <td>
+              <input id="alt_algorithm_names" type="checkbox" checked="checked" autocomplete="off">
+            </td>
+          </tr>
+          <tr>
+            <th class="tt ttright" data-title="">Rebalance on Add Point</th>
+            <td>
+              <input id="rebalance_points_on_order_up" type="checkbox" checked="checked" autocomplete="off">
+            </td>
+          </tr>
+          <tr>
+            <th class="tt ttright" data-title="">Rebalance on Sub Point</th>
+            <td>
+              <input id="rebalance_points_on_order_down" type="checkbox" checked="checked" autocomplete="off">
+            </td>
+          </tr>
+          <tr>
+            <th class="tt ttright" data-title="Toggle showing popups like this">Show Tooltpss</th>
+            <td>
+              <input id="show_tooltips" type="checkbox" checked="checked" autocomplete="off">
+            </td>
+          </tr>
+        </table>
       </div>
     </div>
 

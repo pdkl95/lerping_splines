@@ -1,4 +1,4 @@
-APP = null
+window.APP = null
 
 TAU = 2 * Math.PI
 
@@ -218,6 +218,8 @@ class LERPingSplines
 
   @mouseover_point_radius_boost: 6
 
+  @storage_prefix = 'lerp_spline'
+
   constructor: (@context) ->
 
   init: () ->
@@ -225,14 +227,24 @@ class LERPingSplines
 
     @running = false
 
-    @option =
-      pen_label_enabled: true
-      algorithm_enabled: true
-      alt_algorithm_names: true
-      rebalance_points_on_order_up: false
-      rebalance_points_on_order_down: false
+    @content_el = @context.getElementById('content')
 
-    @content_el       = @context.getElementById('content')
+    @show_tooltips = @context.getElementById('show_tooltips')
+    @show_tooltips.addEventListener('change', @on_show_tooltips_change)
+    @show_tooltips.checked = true    
+
+    @option =
+      show_ticks:                      new UI.BoolOption('show_ticks', false)
+      show_pen_label:                  new UI.BoolOption('show_pen_label', true)
+      show_algorithm:                  new UI.BoolOption('show_algorithm', true)
+      alt_algorithm_names:             new UI.BoolOption('alt_algorithm_names', true)
+      rebalance_points_on_order_up:    new UI.BoolOption('rebalance_points_on_order_up', false)
+      rebalance_points_on_order_down:  new UI.BoolOption('rebalance_points_on_order_down', false)
+      show_tooltips:                   new UI.BoolOption('show_tooltips', true)
+
+    @option.show_algorithm.register_callback
+      on_true:  @on_show_algorithm_true
+      on_false: @on_show_algorithm_false
 
     @graph_wrapper   = @find_element('graph_wrapper')
     @graph_canvas    = @find_element('graph')
@@ -283,9 +295,6 @@ class LERPingSplines
 
     @reset_loop()
 
-    @show_ticks_checkbox = @find_element('show_ticks')
-    @show_ticks_checkbox.addEventListener('change', @on_show_ticks_checkbox)
-
     @btn_play_pause = @find_element('button_play_pause')
     @btn_play_pause.addEventListener('click',@on_btn_play_pause_click)
 
@@ -320,11 +329,6 @@ class LERPingSplines
     @update()
     @stop()
 
-    if @option.algorithm_enabled
-      @show_algorithm()
-    else
-      @hide_algorithm()
-
     #@debug("Ready!")
 
   debug: (msg_text) ->
@@ -358,6 +362,27 @@ class LERPingSplines
     el = @context.getElementById(id)
     @debug("ERROR: missing element ##{id}") unless el?
     el
+
+  storage_key: (key) ->
+    "#{@constructor.storage_prefix}-#{key}"
+
+  storage_set: (key, value, default_value = null) ->
+    if default_value? and (default_value is value)
+      @storage_remove(key)
+    else
+      localStorage.setItem(@storage_key(key), value)
+
+  storage_get: (key) ->
+    localStorage.getItem(@storage_key(key))
+
+  storage_get_int: (key) ->
+    parseInt(@storage_get(key))
+
+  storage_get_float: (key) ->
+    parseFloat(@storage_get(key))
+
+  storage_remove: (key) ->
+    localStorage.removeItem(@storage_key(key))
 
   reset_loop: ->
     @t = 0
@@ -437,7 +462,7 @@ class LERPingSplines
     return if @enabled_points >= LERPingSplines.max_points
     p = @points[0][@enabled_points]
 
-    if rebalance_points and @option.rebalance_points_on_order_up
+    if rebalance_points and @option.rebalance_points_on_order_up.value
       cur_id = @enabled_points
       prev_id = cur_id - 1
       while prev_id >= 0
@@ -528,13 +553,19 @@ class LERPingSplines
   disable_point: ->
     return if @enabled_points <= LERPingSplines.min_points
 
-    if @enabled_points > 3 and @option.rebalance_points_on_order_down
+    if @enabled_points > 3 and @option.rebalance_points_on_order_down.value
       @compute_lower_order_curve()
 
     @enabled_points -= 1
     p = @points[0][@enabled_points]
     p.enabled = false
     @update_enabled_points()
+
+  on_show_tooltips_change: (event) =>
+    if @show_tooltips.checked
+      @content_el.classList.add('show_tt')
+    else
+      @content_el.classList.remove('show_tt')
 
   on_show_ticks_checkbox: (event, ui) =>
     @update_and_draw()
@@ -606,6 +637,9 @@ class LERPingSplines
     @btn_play_pause.innerHTML = "&#x23F5;"
 
   update_algorithm: ->
+    if !@option.show_algorithm.value
+      return
+
     lines = []
     for order in [0..(@enabled_points - 1)]
       if order > 0
@@ -626,13 +660,11 @@ class LERPingSplines
 
     @algorithm_text.innerText = lines.join("\n")
 
-  show_algorithm: =>
-    @option.algorithm_enabled = true
+  on_show_algorithm_true: =>
     @algorithmbox.classList.remove('hidden')
     @update_algorithm()
 
-  hide_algorithm: =>
-    @option.algorithm_enabled = false
+  on_hide_algorithm_false: =>
     @algorithmbox.classList.add('hidden')
 
   clamp_to_canvas: (v) ->
@@ -710,7 +742,7 @@ class LERPingSplines
       for p in order
         p.selected = false
 
-    if @point_has_changed and @option.algorithm_enabled
+    if @point_has_changed
       @update_algorithm()
 
   on_mouseup: (event) =>
@@ -821,7 +853,7 @@ class LERPingSplines
       ctx.lineCap = "round"
       ctx.stroke()
 
-      if @option.pen_label_enabled
+      if @option.show_pen_label.value
         plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), @pen_label_offset_length + 3)
         plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - @pen_label_offset.x
         ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - @pen_label_offset.y + @pen_label_height
@@ -890,7 +922,7 @@ class LERPingSplines
 
   update_and_draw: ->
     @graph_ctx.clearRect(0, 0, @graph_canvas.width, @graph_canvas.height)
-    @draw_ticks() if @show_ticks_checkbox.checked
+    @draw_ticks() if @option.show_ticks.value
     @draw_bezier()
     @update()
     @draw()
@@ -926,6 +958,6 @@ class LERPingSplines
     return null
 
 document.addEventListener 'DOMContentLoaded', =>
-  APP = new LERPingSplines(document)
-  APP.init()
-  APP.draw()
+  window.APP = new LERPingSplines(document)
+  window.APP.init()
+  window.APP.draw()

@@ -1,8 +1,9 @@
 (function() {
-  var APP, Color, LERP, LERPingSplines, Point, TAU, Vec2, clone,
+  var Color, LERP, LERPingSplines, Point, TAU, Vec2, clone,
+    bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
-    bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
+    slice = [].slice;
 
   Color = (function() {
     function Color() {}
@@ -338,7 +339,423 @@ class Matrix {
 /*export { Matrix };*/
 ;
 
-  APP = null;
+  window.UI || (window.UI = {});
+
+  UI.Option = (function() {
+    Option.create_input_element = function(type, id) {
+      var el;
+      if (type == null) {
+        type = null;
+      }
+      if (id == null) {
+        id = null;
+      }
+      el = window.APP.context.createElement('input');
+      if (id != null) {
+        el.id = id;
+      }
+      if (type != null) {
+        el.type = type;
+      }
+      return el;
+    };
+
+    function Option(id1, default_value, callback) {
+      var stored_value;
+      this.id = id1;
+      if (default_value == null) {
+        default_value = null;
+      }
+      this.callback = callback != null ? callback : {};
+      this.on_input = bind(this.on_input, this);
+      this.on_change = bind(this.on_change, this);
+      if (this.id instanceof Element) {
+        this.el = this.id;
+        this.id = this.el.id;
+      } else {
+        this.el = window.APP.context.getElementById(this.id);
+        if (this.el == null) {
+          console.log("ERROR - could not find element with id=\"" + this.id + "\"");
+        }
+      }
+      this.persist = true;
+      this.storage_id = "ui_option-" + this.id;
+      this.label_id = this.id + "_label";
+      this.label_el = window.APP.context.getElementById(this.label_id);
+      this.label_text_formater = this.default_label_text_formater;
+      if (default_value != null) {
+        this["default"] = default_value;
+      } else {
+        this["default"] = this.detect_default_value();
+      }
+      stored_value = APP.storage_get(this.storage_id);
+      if (stored_value != null) {
+        this.set(stored_value);
+      } else {
+        this.set(this["default"]);
+      }
+      this.setup_listeners();
+    }
+
+    Option.prototype.setup_listeners = function() {
+      this.el.addEventListener('change', this.on_change);
+      return this.el.addEventListener('input', this.on_input);
+    };
+
+    Option.prototype.detect_default_value = function() {
+      return this.get();
+    };
+
+    Option.prototype.reset = function() {
+      APP.storage_remove(this.storage_id);
+      return this.set(this["default"]);
+    };
+
+    Option.prototype.register_callback = function(opt) {
+      var func, key, name, ref, results;
+      if (opt == null) {
+        opt = {};
+      }
+      for (name in opt) {
+        func = opt[name];
+        this.callback[name] = func;
+      }
+      ref = this.callback;
+      results = [];
+      for (key in ref) {
+        func = ref[key];
+        if (func == null) {
+          results.push(delete this.callback[name]);
+        } else {
+          results.push(void 0);
+        }
+      }
+      return results;
+    };
+
+    Option.prototype.set_value = function(new_value) {
+      if (new_value == null) {
+        new_value = null;
+      }
+      if (new_value != null) {
+        this.value = new_value;
+      }
+      if (this.label_el != null) {
+        this.label_el.innerText = this.label_text();
+      }
+      if (this.persist) {
+        return APP.storage_set(this.storage_id, this.value, this["default"]);
+      }
+    };
+
+    Option.prototype.default_label_text_formater = function(value) {
+      return "" + value;
+    };
+
+    Option.prototype.label_text = function() {
+      return this.label_text_formater(this.value);
+    };
+
+    Option.prototype.set_label_text_formater = function(func) {
+      this.label_text_formater = func;
+      return this.set_value();
+    };
+
+    Option.prototype.on_change = function(event) {
+      var base;
+      this.set(this.get(event.target), false);
+      return typeof (base = this.callback).on_change === "function" ? base.on_change(this.value) : void 0;
+    };
+
+    Option.prototype.on_input = function(event) {
+      var base;
+      this.set(this.get(event.target), false);
+      return typeof (base = this.callback).on_input === "function" ? base.on_input(this.value) : void 0;
+    };
+
+    Option.prototype.enable = function() {
+      return this.el.disabled = false;
+    };
+
+    Option.prototype.disable = function() {
+      return this.el.disabled = true;
+    };
+
+    Option.prototype.destroy = function() {
+      if (this.el != null) {
+        this.el.remove();
+      }
+      return this.el = null;
+    };
+
+    return Option;
+
+  })();
+
+  UI.BoolOption = (function(superClass) {
+    extend(BoolOption, superClass);
+
+    function BoolOption() {
+      return BoolOption.__super__.constructor.apply(this, arguments);
+    }
+
+    BoolOption.create = function() {
+      var id1, opt, parent, rest;
+      parent = arguments[0], id1 = arguments[1], rest = 3 <= arguments.length ? slice.call(arguments, 2) : [];
+      this.id = id1;
+      opt = (function(func, args, ctor) {
+        ctor.prototype = func.prototype;
+        var child = new ctor, result = func.apply(child, args);
+        return Object(result) === result ? result : child;
+      })(UI.BoolOption, [UIOption.create_input_element('checkbox', this.id)].concat(slice.call(rest)), function(){});
+      parent.appendChild(opt.el);
+      return opt;
+    };
+
+    BoolOption.prototype.get = function(element) {
+      if (element == null) {
+        element = this.el;
+      }
+      return element.checked;
+    };
+
+    BoolOption.prototype.set = function(bool_value, update_element) {
+      var base, base1, newvalue, oldvalue;
+      if (update_element == null) {
+        update_element = true;
+      }
+      oldvalue = this.value;
+      newvalue = (function() {
+        switch (bool_value) {
+          case 'true':
+            return true;
+          case 'false':
+            return false;
+          default:
+            return !!bool_value;
+        }
+      })();
+      if (update_element) {
+        this.el.checked = newvalue;
+      }
+      this.set_value(newvalue);
+      if (oldvalue !== newvalue) {
+        if (newvalue) {
+          return typeof (base = this.callback).on_true === "function" ? base.on_true() : void 0;
+        } else {
+          return typeof (base1 = this.callback).on_false === "function" ? base1.on_false() : void 0;
+        }
+      }
+    };
+
+    return BoolOption;
+
+  })(UI.Option);
+
+  UI.IntOption = (function(superClass) {
+    extend(IntOption, superClass);
+
+    function IntOption() {
+      return IntOption.__super__.constructor.apply(this, arguments);
+    }
+
+    IntOption.create = function() {
+      var id1, opt, parent, rest;
+      parent = arguments[0], id1 = arguments[1], rest = 3 <= arguments.length ? slice.call(arguments, 2) : [];
+      this.id = id1;
+      opt = (function(func, args, ctor) {
+        ctor.prototype = func.prototype;
+        var child = new ctor, result = func.apply(child, args);
+        return Object(result) === result ? result : child;
+      })(UI.IntOption, [UIOption.create_input_element('number', this.id)].concat(slice.call(rest)), function(){});
+      parent.appendChild(opt.el);
+      return opt;
+    };
+
+    IntOption.prototype.get = function(element) {
+      if (element == null) {
+        element = this.el;
+      }
+      return parseInt(element.value);
+    };
+
+    IntOption.prototype.set = function(number_value, update_element) {
+      if (update_element == null) {
+        update_element = true;
+      }
+      this.set_value(parseInt(number_value));
+      if (update_element) {
+        return this.el.value = this.value;
+      }
+    };
+
+    return IntOption;
+
+  })(UI.Option);
+
+  UI.FloatOption = (function(superClass) {
+    extend(FloatOption, superClass);
+
+    function FloatOption() {
+      return FloatOption.__super__.constructor.apply(this, arguments);
+    }
+
+    FloatOption.create = function() {
+      var id1, opt, parent, rest;
+      parent = arguments[0], id1 = arguments[1], rest = 3 <= arguments.length ? slice.call(arguments, 2) : [];
+      this.id = id1;
+      opt = (function(func, args, ctor) {
+        ctor.prototype = func.prototype;
+        var child = new ctor, result = func.apply(child, args);
+        return Object(result) === result ? result : child;
+      })(UI.IntOption, [UIOption.create_input_element(null, this.id)].concat(slice.call(rest)), function(){});
+      parent.appendChild(opt.el);
+      return opt;
+    };
+
+    FloatOption.prototype.get = function(element) {
+      if (element == null) {
+        element = this.el;
+      }
+      return parseFloat(element.value);
+    };
+
+    FloatOption.prototype.set = function(number_value, update_element) {
+      if (update_element == null) {
+        update_element = true;
+      }
+      this.set_value(parseFloat(number_value));
+      if (update_element) {
+        return this.el.value = this.value;
+      }
+    };
+
+    return FloatOption;
+
+  })(UI.Option);
+
+  UI.PercentOption = (function(superClass) {
+    extend(PercentOption, superClass);
+
+    function PercentOption() {
+      return PercentOption.__super__.constructor.apply(this, arguments);
+    }
+
+    PercentOption.prototype.label_text = function() {
+      var perc;
+      perc = parseInt(this.value * 100);
+      return perc + "%";
+    };
+
+    return PercentOption;
+
+  })(UI.FloatOption);
+
+  UI.SelectOption = (function(superClass) {
+    extend(SelectOption, superClass);
+
+    function SelectOption() {
+      return SelectOption.__super__.constructor.apply(this, arguments);
+    }
+
+    SelectOption.prototype.setup_listeners = function() {
+      return this.el.addEventListener('change', this.on_change);
+    };
+
+    SelectOption.prototype.get = function(element) {
+      var opt;
+      if (element == null) {
+        element = this.el;
+      }
+      opt = element.options[element.selectedIndex];
+      if (opt != null) {
+        return opt.value;
+      } else {
+        return null;
+      }
+    };
+
+    SelectOption.prototype.set = function(option_name, update_element) {
+      var opt;
+      if (update_element == null) {
+        update_element = true;
+      }
+      opt = this.option_with_name(option_name);
+      if (opt != null) {
+        this.set_value(opt.value);
+        if (update_element) {
+          return opt.selected = true;
+        }
+      }
+    };
+
+    SelectOption.prototype.values = function() {
+      return this.el.options.map(function(x) {
+        return x.name;
+      });
+    };
+
+    SelectOption.prototype.option_with_name = function(name) {
+      var l, len, opt, ref;
+      ref = this.el.options;
+      for (l = 0, len = ref.length; l < len; l++) {
+        opt = ref[l];
+        if (opt.value === name) {
+          return opt;
+        }
+      }
+      return null;
+    };
+
+    SelectOption.prototype.add_option = function(value, text, selected) {
+      var opt;
+      if (selected == null) {
+        selected = false;
+      }
+      opt = document.createElement('option');
+      opt.value = value;
+      opt.text = text;
+      this.el.add(opt, null);
+      if (selected) {
+        opt.selected = true;
+      }
+      return this.set(this.get());
+    };
+
+    return SelectOption;
+
+  })(UI.Option);
+
+  UI.ColorOption = (function(superClass) {
+    extend(ColorOption, superClass);
+
+    function ColorOption() {
+      return ColorOption.__super__.constructor.apply(this, arguments);
+    }
+
+    ColorOption.prototype.get = function(element) {
+      if (element == null) {
+        element = this.el;
+      }
+      return element.value;
+    };
+
+    ColorOption.prototype.set = function(new_value, update_element) {
+      if (update_element == null) {
+        update_element = true;
+      }
+      this.set_value(new_value);
+      if (update_element) {
+        this.el.value = new_value;
+      }
+      return this.color;
+    };
+
+    return ColorOption;
+
+  })(UI.Option);
+
+  window.APP = null;
 
   TAU = 2 * Math.PI;
 
@@ -592,6 +1009,8 @@ class Matrix {
 
     LERPingSplines.mouseover_point_radius_boost = 6;
 
+    LERPingSplines.storage_prefix = 'lerp_spline';
+
     function LERPingSplines(context) {
       this.context = context;
       this.schedule_first_frame = bind(this.schedule_first_frame, this);
@@ -609,8 +1028,8 @@ class Matrix {
       this.on_mousemove = bind(this.on_mousemove, this);
       this.on_mousemove_canvas = bind(this.on_mousemove_canvas, this);
       this.on_mousemove_tslider = bind(this.on_mousemove_tslider, this);
-      this.hide_algorithm = bind(this.hide_algorithm, this);
-      this.show_algorithm = bind(this.show_algorithm, this);
+      this.on_hide_algorithm_false = bind(this.on_hide_algorithm_false, this);
+      this.on_show_algorithm_true = bind(this.on_show_algorithm_true, this);
       this.stop = bind(this.stop, this);
       this.start = bind(this.start, this);
       this.on_tslide_btn_max_click = bind(this.on_tslide_btn_max_click, this);
@@ -620,20 +1039,30 @@ class Matrix {
       this.on_remove_point_btn_click = bind(this.on_remove_point_btn_click, this);
       this.on_add_point_btn_click = bind(this.on_add_point_btn_click, this);
       this.on_show_ticks_checkbox = bind(this.on_show_ticks_checkbox, this);
+      this.on_show_tooltips_change = bind(this.on_show_tooltips_change, this);
     }
 
     LERPingSplines.prototype.init = function() {
       var ref, ref1;
       console.log('Starting init()...');
       this.running = false;
-      this.option = {
-        pen_label_enabled: true,
-        algorithm_enabled: true,
-        alt_algorithm_names: true,
-        rebalance_points_on_order_up: false,
-        rebalance_points_on_order_down: false
-      };
       this.content_el = this.context.getElementById('content');
+      this.show_tooltips = this.context.getElementById('show_tooltips');
+      this.show_tooltips.addEventListener('change', this.on_show_tooltips_change);
+      this.show_tooltips.checked = true;
+      this.option = {
+        show_ticks: new UI.BoolOption('show_ticks', false),
+        show_pen_label: new UI.BoolOption('show_pen_label', true),
+        show_algorithm: new UI.BoolOption('show_algorithm', true),
+        alt_algorithm_names: new UI.BoolOption('alt_algorithm_names', true),
+        rebalance_points_on_order_up: new UI.BoolOption('rebalance_points_on_order_up', false),
+        rebalance_points_on_order_down: new UI.BoolOption('rebalance_points_on_order_down', false),
+        show_tooltips: new UI.BoolOption('show_tooltips', true)
+      };
+      this.option.show_algorithm.register_callback({
+        on_true: this.on_show_algorithm_true,
+        on_false: this.on_show_algorithm_false
+      });
       this.graph_wrapper = this.find_element('graph_wrapper');
       this.graph_canvas = this.find_element('graph');
       this.graph_ctx = this.graph_canvas.getContext('2d', {
@@ -673,8 +1102,6 @@ class Matrix {
       this.tslider.range = this.tslider.max - this.tslider.min;
       this.tslider.handle.addEventListener('mousedown', this.on_tslider_mousedown);
       this.reset_loop();
-      this.show_ticks_checkbox = this.find_element('show_ticks');
-      this.show_ticks_checkbox.addEventListener('change', this.on_show_ticks_checkbox);
       this.btn_play_pause = this.find_element('button_play_pause');
       this.btn_play_pause.addEventListener('click', this.on_btn_play_pause_click);
       this.num_points = this.find_element('num_points');
@@ -703,12 +1130,7 @@ class Matrix {
       console.log('init() completed!');
       this.add_initial_points();
       this.update();
-      this.stop();
-      if (this.option.algorithm_enabled) {
-        return this.show_algorithm();
-      } else {
-        return this.hide_algorithm();
-      }
+      return this.stop();
     };
 
     LERPingSplines.prototype.debug = function(msg_text) {
@@ -757,6 +1179,37 @@ class Matrix {
         this.debug("ERROR: missing element #" + id);
       }
       return el;
+    };
+
+    LERPingSplines.prototype.storage_key = function(key) {
+      return this.constructor.storage_prefix + "-" + key;
+    };
+
+    LERPingSplines.prototype.storage_set = function(key, value, default_value) {
+      if (default_value == null) {
+        default_value = null;
+      }
+      if ((default_value != null) && (default_value === value)) {
+        return this.storage_remove(key);
+      } else {
+        return localStorage.setItem(this.storage_key(key), value);
+      }
+    };
+
+    LERPingSplines.prototype.storage_get = function(key) {
+      return localStorage.getItem(this.storage_key(key));
+    };
+
+    LERPingSplines.prototype.storage_get_int = function(key) {
+      return parseInt(this.storage_get(key));
+    };
+
+    LERPingSplines.prototype.storage_get_float = function(key) {
+      return parseFloat(this.storage_get(key));
+    };
+
+    LERPingSplines.prototype.storage_remove = function(key) {
+      return localStorage.removeItem(this.storage_key(key));
     };
 
     LERPingSplines.prototype.reset_loop = function() {
@@ -848,7 +1301,7 @@ class Matrix {
         return;
       }
       p = this.points[0][this.enabled_points];
-      if (rebalance_points && this.option.rebalance_points_on_order_up) {
+      if (rebalance_points && this.option.rebalance_points_on_order_up.value) {
         cur_id = this.enabled_points;
         prev_id = cur_id - 1;
         while (prev_id >= 0) {
@@ -946,13 +1399,21 @@ class Matrix {
       if (this.enabled_points <= LERPingSplines.min_points) {
         return;
       }
-      if (this.enabled_points > 3 && this.option.rebalance_points_on_order_down) {
+      if (this.enabled_points > 3 && this.option.rebalance_points_on_order_down.value) {
         this.compute_lower_order_curve();
       }
       this.enabled_points -= 1;
       p = this.points[0][this.enabled_points];
       p.enabled = false;
       return this.update_enabled_points();
+    };
+
+    LERPingSplines.prototype.on_show_tooltips_change = function(event) {
+      if (this.show_tooltips.checked) {
+        return this.content_el.classList.add('show_tt');
+      } else {
+        return this.content_el.classList.remove('show_tt');
+      }
     };
 
     LERPingSplines.prototype.on_show_ticks_checkbox = function(event, ui) {
@@ -1045,6 +1506,9 @@ class Matrix {
 
     LERPingSplines.prototype.update_algorithm = function() {
       var l, label, len, lines, m, order, p, ref, ref1;
+      if (!this.option.show_algorithm.value) {
+        return;
+      }
       lines = [];
       for (order = l = 0, ref = this.enabled_points - 1; 0 <= ref ? l <= ref : l >= ref; order = 0 <= ref ? ++l : --l) {
         if (order > 0) {
@@ -1070,14 +1534,12 @@ class Matrix {
       return this.algorithm_text.innerText = lines.join("\n");
     };
 
-    LERPingSplines.prototype.show_algorithm = function() {
-      this.option.algorithm_enabled = true;
+    LERPingSplines.prototype.on_show_algorithm_true = function() {
       this.algorithmbox.classList.remove('hidden');
       return this.update_algorithm();
     };
 
-    LERPingSplines.prototype.hide_algorithm = function() {
-      this.option.algorithm_enabled = false;
+    LERPingSplines.prototype.on_hide_algorithm_false = function() {
       return this.algorithmbox.classList.add('hidden');
     };
 
@@ -1201,7 +1663,7 @@ class Matrix {
           p.selected = false;
         }
       }
-      if (this.point_has_changed && this.option.algorithm_enabled) {
+      if (this.point_has_changed) {
         return this.update_algorithm();
       }
     };
@@ -1360,7 +1822,7 @@ class Matrix {
         ctx.lineWidth = 2;
         ctx.lineCap = "round";
         ctx.stroke();
-        if (this.option.pen_label_enabled) {
+        if (this.option.show_pen_label.value) {
           plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), this.pen_label_offset_length + 3);
           plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - this.pen_label_offset.x;
           ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - this.pen_label_offset.y + this.pen_label_height;
@@ -1433,7 +1895,7 @@ class Matrix {
 
     LERPingSplines.prototype.update_and_draw = function() {
       this.graph_ctx.clearRect(0, 0, this.graph_canvas.width, this.graph_canvas.height);
-      if (this.show_ticks_checkbox.checked) {
+      if (this.option.show_ticks.value) {
         this.draw_ticks();
       }
       this.draw_bezier();
@@ -1485,9 +1947,9 @@ class Matrix {
 
   document.addEventListener('DOMContentLoaded', (function(_this) {
     return function() {
-      APP = new LERPingSplines(document);
-      APP.init();
-      return APP.draw();
+      window.APP = new LERPingSplines(document);
+      window.APP.init();
+      return window.APP.draw();
     };
   })(this));
 

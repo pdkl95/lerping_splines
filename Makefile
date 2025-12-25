@@ -18,6 +18,7 @@ RM ?= rm -f
 PROJECT_COFFEE_SRC = \
 	color.coffee \
 	math.coffee  \
+	uioption.coffee \
 	main.coffee
 
 JS_TARGETS = $(PROJECT).js
