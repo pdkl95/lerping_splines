@@ -94,6 +94,31 @@ class UI.BoolOption extends UI.Option
     parent.appendChild(opt.el)
     opt
 
+  constructor: (args...) ->
+    super(args...)
+
+    parent = @el.parentElement
+
+    @on_el =window.APP.context.createElement('span')
+    @on_el.id = "#{@id}_on"
+    @on_el.textContent = "On"
+    @on_el.classList.add("bool_option_state")
+    @on_el.classList.add("on")
+    @on_el.addEventListener('click', => @set(false))
+    parent.appendChild(@on_el)
+
+    @off_el =window.APP.context.createElement('span')
+    @off_el.id = "#{@id}_off"
+    @off_el.textContent = "Off"
+    @off_el.classList.add("bool_option_state")
+    @off_el.classList.add("off")
+    @off_el.addEventListener('click', => @set(true))
+    parent.appendChild(@off_el)
+
+    @el.classList.add("hidden")
+
+    @set(@get())
+
   get: (element = @el) ->
     element.checked
 
@@ -112,6 +137,15 @@ class UI.BoolOption extends UI.Option
         @callback.on_true?()
       else
         @callback.on_false?()
+
+  set_value: (new_value = null) ->
+    super(new_value)
+    if @get()
+      @on_el.classList.remove('hidden') if @on_el?
+      @off_el.classList.add('hidden') if @off_el?
+    else
+      @on_el.classList.add('hidden') if @on_el?
+      @off_el.classList.remove('hidden') if @off_el?
 
 class UI.IntOption extends UI.Option
   @create: (parent, @id, rest...) ->

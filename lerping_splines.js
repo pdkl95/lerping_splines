@@ -495,10 +495,6 @@ class Matrix {
   UI.BoolOption = (function(superClass) {
     extend(BoolOption, superClass);
 
-    function BoolOption() {
-      return BoolOption.__super__.constructor.apply(this, arguments);
-    }
-
     BoolOption.create = function() {
       var id1, opt, parent, rest;
       parent = arguments[0], id1 = arguments[1], rest = 3 <= arguments.length ? slice.call(arguments, 2) : [];
@@ -511,6 +507,37 @@ class Matrix {
       parent.appendChild(opt.el);
       return opt;
     };
+
+    function BoolOption() {
+      var args, parent;
+      args = 1 <= arguments.length ? slice.call(arguments, 0) : [];
+      BoolOption.__super__.constructor.apply(this, args);
+      parent = this.el.parentElement;
+      this.on_el = window.APP.context.createElement('span');
+      this.on_el.id = this.id + "_on";
+      this.on_el.textContent = "On";
+      this.on_el.classList.add("bool_option_state");
+      this.on_el.classList.add("on");
+      this.on_el.addEventListener('click', (function(_this) {
+        return function() {
+          return _this.set(false);
+        };
+      })(this));
+      parent.appendChild(this.on_el);
+      this.off_el = window.APP.context.createElement('span');
+      this.off_el.id = this.id + "_off";
+      this.off_el.textContent = "Off";
+      this.off_el.classList.add("bool_option_state");
+      this.off_el.classList.add("off");
+      this.off_el.addEventListener('click', (function(_this) {
+        return function() {
+          return _this.set(true);
+        };
+      })(this));
+      parent.appendChild(this.off_el);
+      this.el.classList.add("hidden");
+      this.set(this.get());
+    }
 
     BoolOption.prototype.get = function(element) {
       if (element == null) {
@@ -544,6 +571,28 @@ class Matrix {
           return typeof (base = this.callback).on_true === "function" ? base.on_true() : void 0;
         } else {
           return typeof (base1 = this.callback).on_false === "function" ? base1.on_false() : void 0;
+        }
+      }
+    };
+
+    BoolOption.prototype.set_value = function(new_value) {
+      if (new_value == null) {
+        new_value = null;
+      }
+      BoolOption.__super__.set_value.call(this, new_value);
+      if (this.get()) {
+        if (this.on_el != null) {
+          this.on_el.classList.remove('hidden');
+        }
+        if (this.off_el != null) {
+          return this.off_el.classList.add('hidden');
+        }
+      } else {
+        if (this.on_el != null) {
+          this.on_el.classList.add('hidden');
+        }
+        if (this.off_el != null) {
+          return this.off_el.classList.remove('hidden');
         }
       }
     };

@@ -483,3 +483,24 @@ button[disabled] {
 #algorithmbox h4 {
   margin-left: 0;
 }
+
+.options th {
+  text-align: right;
+}
+
+.bool_option_state {
+
+}
+
+.bool_option_state.on {
+  color: #fff;
+  background-color: #070;
+  border-color: #3a3;
+}
+
+.bool_option_state.off {
+  color: #fff;
+  background-color: #600;
+  border-color: #a33;
+}
+
