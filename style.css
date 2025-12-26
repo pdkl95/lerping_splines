@@ -396,10 +396,6 @@ button[disabled] {
   margin-top: 0.5rem;
 }
 
-.tabbox_wrapper > [type="radio"] {
-  display: none;
-}
-
 [id^="alg_opt_tabbox"] {
   display: none;
 }
@@ -424,6 +420,10 @@ button[disabled] {
   margin-left: 0.3rem;
   border-top-left-radius: 4px;
   border-top-right-radius: 4px;
+}
+
+.tabbox_wrapper .tab_input {
+  display: none;
 }
 
 .tabbox_wrapper > .tab:first-of-type {
@@ -456,7 +456,8 @@ button[disabled] {
 }
 
 #alg_opt_tabs_algorithm_input:checked ~ #alg_opt_tabbox-algorithm,
-#alg_opt_tabs_options_input:checked ~ #alg_opt_tabbox-options {
+#alg_opt_tabs_options_input:checked ~ #alg_opt_tabbox-options,
+#alg_opt_tabs_mode_input:checked ~ #alg_opt_tabbox-mode {
   display: block;
 }
 
@@ -488,19 +489,67 @@ button[disabled] {
   text-align: right;
 }
 
-.bool_option_state {
+.choice_wrapper {
+  margin-top: 0.5rem;
+  margin-left: 2rem;
+}
 
+.choice_wrapper > .choice {
+  float: left;
+}
+
+.choice_wrapper [type="radio"] {
+  display: none;
+}
+
+.choice_wrapper > .choice + .choice {
+  margin-left: 1rem;
+}
+
+.choice_wrapper .choice_btn {
+  background-color: #EDC5B5;
+  border: 2px dashed #F9A483;
+  border-radius: 6px;
+  padding: 2px 5px;
+  font-size: larger;
+  font-weight: bold;
+  width: 4rem;
+  text-align: center;
+}
+
+.choice_wrapper .choice_btn:hover {
+  border-style: solid;
+  border-radius: 0;
+}
+
+.choice_wrapper [type="radio"]:checked + .choice_btn {
+  background-color: #BDEDB5;
+  border-color: #5FEB47
+}
+
+.bool_option_state {
+  width: 3rem;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  text-align: center;
 }
 
 .bool_option_state.on {
+  display: inline-block;
   color: #fff;
   background-color: #070;
   border-color: #3a3;
 }
 
 .bool_option_state.off {
+  display: inline-block;
   color: #fff;
   background-color: #600;
   border-color: #a33;
+}
+
+.bool_option_state.on.hidden,
+.bool_option_state.off.hidden {
+  display: none;
 }
 

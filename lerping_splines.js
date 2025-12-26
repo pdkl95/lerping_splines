@@ -511,6 +511,8 @@ class Matrix {
     function BoolOption() {
       var args, parent;
       args = 1 <= arguments.length ? slice.call(arguments, 0) : [];
+      this.on_bool_option_state_off_click = bind(this.on_bool_option_state_off_click, this);
+      this.on_bool_option_state_on_click = bind(this.on_bool_option_state_on_click, this);
       BoolOption.__super__.constructor.apply(this, args);
       parent = this.el.parentElement;
       this.on_el = window.APP.context.createElement('span');
@@ -518,26 +520,30 @@ class Matrix {
       this.on_el.textContent = "On";
       this.on_el.classList.add("bool_option_state");
       this.on_el.classList.add("on");
-      this.on_el.addEventListener('click', (function(_this) {
-        return function() {
-          return _this.set(false);
-        };
-      })(this));
+      this.on_el.addEventListener('click', this.on_bool_option_state_on_click);
       parent.appendChild(this.on_el);
       this.off_el = window.APP.context.createElement('span');
       this.off_el.id = this.id + "_off";
       this.off_el.textContent = "Off";
       this.off_el.classList.add("bool_option_state");
       this.off_el.classList.add("off");
-      this.off_el.addEventListener('click', (function(_this) {
-        return function() {
-          return _this.set(true);
-        };
-      })(this));
+      this.off_el.addEventListener('click', this.on_bool_option_state_off_click);
       parent.appendChild(this.off_el);
       this.el.classList.add("hidden");
       this.set(this.get());
     }
+
+    BoolOption.prototype.on_bool_option_state_on_click = function() {
+      var base;
+      this.set(false);
+      return typeof (base = this.callback).on_change === "function" ? base.on_change(this.value) : void 0;
+    };
+
+    BoolOption.prototype.on_bool_option_state_off_click = function() {
+      var base;
+      this.set(true);
+      return typeof (base = this.callback).on_change === "function" ? base.on_change(this.value) : void 0;
+    };
 
     BoolOption.prototype.get = function(element) {
       if (element == null) {
@@ -580,6 +586,10 @@ class Matrix {
         new_value = null;
       }
       BoolOption.__super__.set_value.call(this, new_value);
+      return this.update_on_off_classes();
+    };
+
+    BoolOption.prototype.update_on_off_classes = function() {
       if (this.get()) {
         if (this.on_el != null) {
           this.on_el.classList.remove('hidden');

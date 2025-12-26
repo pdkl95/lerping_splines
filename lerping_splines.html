@@ -45,73 +45,91 @@
         </div>
       </div>
 
-    <div id="debugbox" class="hidden clear_both canvas_width"></div>
+      <div id="debugbox" class="hidden clear_both canvas_width"></div>
 
-    <div id="alg_opt_box" class="clear_both canvas_width tabbox_wrapper">
-      <input type="radio" name="alg_opt_tabs" id="alg_opt_tabs_algorithm_input" checked>
-      <label class="tab" for="alg_opt_tabs_algorithm_input"><h2>Algorithm</h2></label>
-      <input type="radio" name="alg_opt_tabs" id="alg_opt_tabs_options_input">
-      <label class="tab" for="alg_opt_tabs_options_input"><h2>Options</h2></label>
+      <div id="alg_opt_box" class="clear_both canvas_width tabbox_wrapper">
+        <input type="radio" name="alg_opt_tabs" id="alg_opt_tabs_algorithm_input" class="tab_input" checked>
+        <label class="tab" for="alg_opt_tabs_algorithm_input"><h2>Algorithm</h2></label>
+        <input type="radio" name="alg_opt_tabs" id="alg_opt_tabs_options_input" class="tab_input">
+        <label class="tab" for="alg_opt_tabs_options_input"><h2>Options</h2></label>
+        <input type="radio" name="alg_opt_tabs" id="alg_opt_tabs_mode_input" class="tab_input">
+        <label class="tab" for="alg_opt_tabs_mode_input"><h2>Mode</h2></label>
 
-      <div id="alg_opt_tabbox-algorithm" class="tabcontent">
-        <div id="algorithmbox">
-          <h4>Lerp: Linear Intrpolaton</h4>
-          <pre>function Lerp(vector1, vector2, t) {
-    return ((1-t) * vector1) +
-           (   t  * vector2)
-}</pre>
-          <h4>It's Lerp All The Way Down</h4>
-          <pre id="algorithm_text"></pre>
+        <div id="alg_opt_tabbox-algorithm" class="tabcontent">
+          <div id="algorithmbox">
+            <h4>Lerp: Linear Intrpolaton</h4>
+            <pre>function Lerp(vector1, vector2, t) {
+              return ((1-t) * vector1) +
+              (   t  * vector2)
+              }</pre>
+            <h4>It's Lerp All The Way Down</h4>
+            <pre id="algorithm_text"></pre>
+          </div>
+        </div>
+
+        <div id="alg_opt_tabbox-options" class="tabcontent">
+          <table class="options">
+            <tr>
+              <th class="tt ttright" data-title="The tick marks represent the parametric distance fraction of 't', not length">Show Ticks</th>
+              <td>
+                <input id="show_ticks" type="checkbox" checked="checked" autocomplete="off">
+              </td>
+            </tr>
+            <tr>
+              <th class="tt ttright" data-title="The arrow labeled 'P'">Show pen label</th>
+              <td>
+                <input id="show_pen_label" type="checkbox" checked="checked" autocomplete="off">
+              </td>
+            </tr>
+            <tr>
+              <th class="tt ttright" data-title="Disable if th t4xt b=is getting too large">Show Algorithm</th>
+              <td>
+                <input id="show_algorithm" type="checkbox" checked="checked" autocomplete="off">
+              </td>
+            </tr>
+            <tr>
+              <th class="tt ttright" data-title="More informative variable names that are ay too big at higher Bezier orders">Alt algorithm names</th>
+              <td>
+                <input id="alt_algorithm_names" type="checkbox" checked="checked" autocomplete="off">
+              </td>
+            </tr>
+            <tr>
+              <th class="tt ttright" data-title="When active, redistributes the points such that a new point can be added without changing the curve">Rebalance on Add Point</th>
+              <td>
+                <input id="rebalance_points_on_order_up" type="checkbox" checked="checked" autocomplete="off">
+              </td>
+            </tr>
+            <tr>
+              <th class="tt ttright" data-title="Attempts to minimize the error when removing a point">Rebalance on Sub Point</th>
+              <td>
+                <input id="rebalance_points_on_order_down" type="checkbox" checked="checked" autocomplete="off">
+              </td>
+            </tr>
+            <tr>
+              <th class="tt ttright" data-title="Toggle showing popups like this">Show Tooltpss</th>
+              <td>
+                <input id="show_tooltips" type="checkbox" checked="checked" autocomplete="off">
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <div id="alg_opt_tabbox-mode" class="tabcontent">
+          <div id="modebox">
+            <div class="choice_wrapper">
+              <div class="choice">
+                <input type="radio" name="mode_choice" id="mode_choice_bezier_input">
+                <label class="choice_btn" for="mode_choice_bezier_input">Bezier</label>
+              </div>
+              <div class="choice">
+                <input type="radio" name="mode_choice" id="mode_choice_spline_input">
+                <label class="choice_btn" for="mode_choice_spline_input">Spline</label>
+              </div>
+              <div class="clear_both"></div>
+            </div>
+          </div>
         </div>
       </div>
-
-      <div id="alg_opt_tabbox-options" class="tabcontent">
-        <table class="options">
-          <tr>
-            <th class="tt ttright" data-title="The tick marks represent the parametric distance fraction of 't', not length">Show Ticks</th>
-            <td>
-              <input id="show_ticks" type="checkbox" checked="checked" autocomplete="off">
-            </td>
-          </tr>
-          <tr>
-            <th class="tt ttright" data-title="The arrow labeled \"P\"">Show pen label</th>
-            <td>
-              <input id="show_pen_label" type="checkbox" checked="checked" autocomplete="off">
-            </td>
-          </tr>
-          <tr>
-            <th class="tt ttright" data-title="Disable if th t4xt b=is getting too large">Show Algorithm</th>
-            <td>
-              <input id="show_algorithm" type="checkbox" checked="checked" autocomplete="off">
-            </td>
-          </tr>
-          <tr>
-            <th class="tt ttright" data-title="More informative variable names that are ay too big at higher Bezier orders">Alt algorithm names</th>
-            <td>
-              <input id="alt_algorithm_names" type="checkbox" checked="checked" autocomplete="off">
-            </td>
-          </tr>
-          <tr>
-            <th class="tt ttright" data-title="When active, redistributes the points such that a new point can be added without changing the curve">Rebalance on Add Point</th>
-            <td>
-              <input id="rebalance_points_on_order_up" type="checkbox" checked="checked" autocomplete="off">
-            </td>
-          </tr>
-          <tr>
-            <th class="tt ttright" data-title="Attempts to minimize the error when removing a point">Rebalance on Sub Point</th>
-            <td>
-              <input id="rebalance_points_on_order_down" type="checkbox" checked="checked" autocomplete="off">
-            </td>
-          </tr>
-          <tr>
-            <th class="tt ttright" data-title="Toggle showing popups like this">Show Tooltpss</th>
-            <td>
-              <input id="show_tooltips" type="checkbox" checked="checked" autocomplete="off">
-            </td>
-          </tr>
-        </table>
-      </div>
-    </div>
     </div>
 
     <div class="clear_both"></div>

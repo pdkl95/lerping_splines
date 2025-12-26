@@ -45,7 +45,6 @@ class UI.Option
   reset: ->
     APP.storage_remove(@storage_id)
     @set(@default)
-
   register_callback: (opt = {}) ->
     for name, func of opt
       @callback[name] = func
@@ -70,7 +69,7 @@ class UI.Option
     @label_text_formater = func
     @set_value()
 
-  on_change: (event) =>
+  on_change: (event) => 
     @set(@get(event.target), false)
     @callback.on_change?(@value)
 
@@ -104,7 +103,7 @@ class UI.BoolOption extends UI.Option
     @on_el.textContent = "On"
     @on_el.classList.add("bool_option_state")
     @on_el.classList.add("on")
-    @on_el.addEventListener('click', => @set(false))
+    @on_el.addEventListener('click', @on_bool_option_state_on_click);
     parent.appendChild(@on_el)
 
     @off_el =window.APP.context.createElement('span')
@@ -112,12 +111,20 @@ class UI.BoolOption extends UI.Option
     @off_el.textContent = "Off"
     @off_el.classList.add("bool_option_state")
     @off_el.classList.add("off")
-    @off_el.addEventListener('click', => @set(true))
+    @off_el.addEventListener('click', @on_bool_option_state_off_click);
     parent.appendChild(@off_el)
 
     @el.classList.add("hidden")
 
     @set(@get())
+
+  on_bool_option_state_on_click: =>
+    @set(false)
+    @callback.on_change?(@value)
+
+  on_bool_option_state_off_click: =>
+    @set(true)
+    @callback.on_change?(@value)
 
   get: (element = @el) ->
     element.checked
@@ -140,6 +147,9 @@ class UI.BoolOption extends UI.Option
 
   set_value: (new_value = null) ->
     super(new_value)
+    @update_on_off_classes()
+
+  update_on_off_classes: ->
     if @get()
       @on_el.classList.remove('hidden') if @on_el?
       @off_el.classList.add('hidden') if @off_el?
