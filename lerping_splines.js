@@ -1434,7 +1434,7 @@ class Matrix {
 
     Curve.prototype.get_normal = function() {
       var normal;
-      this.update_at(this.t - this.t_step);
+      this.update_at(APP.t - APP.t_step);
       this.pen.prev_position.x = this.pen.position.x;
       this.pen.prev_position.y = this.pen.position.y;
       this.update();
@@ -1489,8 +1489,8 @@ class Matrix {
       if (this.pen == null) {
         return;
       }
-      t_save = this.t;
-      this.t = t;
+      t_save = APP.t;
+      APP.t = t;
       normal = this.get_normal();
       if (normal != null) {
         normal = Vec2.scale(normal, 3 + (4.0 * size));
@@ -1506,7 +1506,7 @@ class Matrix {
         ctx.lineWidth = size > 3 ? 2 : 1;
         ctx.stroke();
       }
-      return this.t = t_save;
+      return APP.t = t_save;
     };
 
     Curve.prototype.draw_ticks = function() {
@@ -1856,52 +1856,29 @@ class Matrix {
       return results;
     };
 
-    Spline.prototype.draw_segment = function() {
-      var ctx, i, l, p, ref, start, t;
-      if (!((this.points != null) && (this.points[0] != null))) {
-        return;
+    Spline.prototype.call_on_each_segment = function(func_name) {
+      var i, l, ref, results;
+      results = [];
+      for (i = l = 0, ref = this.segment_count; 0 <= ref ? l <= ref : l >= ref; i = 0 <= ref ? ++l : --l) {
+        results.push(this.segment[i][func_name]());
       }
-      start = this.points[0][0];
-      p = null;
-      for (i = l = ref = this.max_points() - 1; ref <= 1 ? l <= 1 : l >= 1; i = ref <= 1 ? ++l : --l) {
-        p = this.points[i][0];
-        if (p != null ? p.enabled : void 0) {
-          break;
-        }
-      }
-      if (this.pen == null) {
-        this.debug("missing pen");
-      }
-      if (p !== this.pen) {
-        console.log('p', p);
-        console.log('@pen', this.pen);
-      }
-      p = this.pen;
-      ctx = APP.graph_ctx;
-      ctx.beginPath();
-      ctx.strokeStyle = p.color;
-      ctx.lineWidth = 3;
-      t = 0.0;
-      this.update_at(t);
-      ctx.moveTo(p.position.x, p.position.y);
-      while (t < 1.0) {
-        t += 0.02;
-        this.update_at(t);
-        ctx.lineTo(p.position.x, p.position.y);
-      }
-      return ctx.stroke();
+      return results;
     };
 
-    Spline.prototype.draw_curve = function() {};
+    Spline.prototype.update = function() {
+      return this.call_on_each_segment('update');
+    };
+
+    Spline.prototype.draw_curve = function() {
+      return this.call_on_each_segment('draw_curve');
+    };
 
     Spline.prototype.draw_ticks = function() {
-      var i, l, ref, save_t_segment;
-      save_t_segment = this.t_segment;
-      for (i = l = 0, ref = this.segment_count; 0 <= ref ? l <= ref : l >= ref; i = 0 <= ref ? ++l : --l) {
-        this.set_current_segment(i);
-        Spline.__super__.draw_ticks.apply(this, arguments);
-      }
-      return this.t_segment = save_t_segment;
+      return this.call_on_each_segment('draw_ticks');
+    };
+
+    Spline.prototype.draw = function() {
+      return this.call_on_each_segment('draw');
     };
 
     Spline.prototype.get_algorithm_text = function() {
@@ -2054,6 +2031,7 @@ class Matrix {
         ref1.addEventListener('click', this.on_remove_point_btn_click);
       }
       this.num_order = this.find_element('num_order');
+      this.order_wrapper = this.find_element('order_wrapper');
       this.add_order_btn = this.find_element('add_order');
       if ((ref2 = this.add_order_btn) != null) {
         ref2.addEventListener('click', this.on_add_order_btn_click);
@@ -2181,6 +2159,7 @@ class Matrix {
       this.bezier_mode = true;
       this.spline_mode = false;
       this.curve = this.bezier_curve;
+      this.order_wrapper.classList.add('hidden');
       return this.update_and_draw();
     };
 
@@ -2189,6 +2168,7 @@ class Matrix {
       this.bezier_mode = false;
       this.spline_mode = true;
       this.curve = this.spline_curve;
+      this.order_wrapper.classList.remove('hidden');
       return this.update_and_draw();
     };
 

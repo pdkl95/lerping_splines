@@ -381,7 +381,7 @@ class Curve
       p.draw()
 
   get_normal: ->
-    @update_at(@t - @t_step)
+    @update_at(APP.t - APP.t_step)
     @pen.prev_position.x = @pen.position.x
     @pen.prev_position.y = @pen.position.y
     @update()
@@ -431,9 +431,9 @@ class Curve
 
   draw_tick_at: (t, size) ->
     return unless @pen?
-    t_save = @t
+    t_save = APP.t
 
-    @t = t
+    APP.t = t
     normal = @get_normal()
     if normal?
       normal = Vec2.scale(normal, 3 + (4.0 * size))
@@ -452,7 +452,7 @@ class Curve
       ctx.lineWidth = if size > 3 then 2 else 1
       ctx.stroke()
 
-    @t = t_save
+    APP.t = t_save
 
   draw_ticks: ->
     @draw_tick_at(0.0,     5)
@@ -746,48 +746,21 @@ class Spline extends Curve
       eidz = pidx + @order + 1
       @segment[i].set_points( @points.slice(sidx, eidx) )
 
-  draw_segment: ->
-    return unless @points? and @points[0]?
+  call_on_each_segment: (func_name) ->
+    for i in [0..@segment_count]
+      @segment[i][func_name]()
 
-    start = @points[0][0]
-
-    p = null
-    for i in [(@max_points() - 1)..1]
-      p = @points[i][0]
-      if p?.enabled
-        break
-
-    @debug("missing pen") unless @pen?
-    if p isnt @pen
-      console.log('p',p)
-      console.log('@pen',@pen)
-    p = @pen
-
-    ctx = APP.graph_ctx
-    ctx.beginPath()
-    ctx.strokeStyle = p.color
-    ctx.lineWidth = 3
-
-    t = 0.0
-    @update_at(t)
-    ctx.moveTo(p.position.x, p.position.y)
-    while t < 1.0
-      t += 0.02
-      @update_at(t)
-      ctx.lineTo(p.position.x, p.position.y)
-
-    ctx.stroke()
+  update: ->
+    @call_on_each_segment('update')
 
   draw_curve: ->
+    @call_on_each_segment('draw_curve')
 
   draw_ticks: ->
-    save_t_segment = @t_segment
-    
-    for i in [0..@segment_count]
-      @set_current_segment(i)
-      super
-
-    @t_segment = save_t_segment
+    @call_on_each_segment('draw_ticks')
+ 
+  draw: ->
+    @call_on_each_segment('draw')
 
   get_algorithm_text: ->
     ''
@@ -910,6 +883,8 @@ class LERPingSplines
 
     @num_order = @find_element('num_order')
 
+    @order_wrapper = @find_element('order_wrapper')
+
     @add_order_btn = @find_element('add_order')
     @add_order_btn?.addEventListener('click', @on_add_order_btn_click)
 
@@ -1012,6 +987,9 @@ class LERPingSplines
     @bezier_mode = true
     @spline_mode = false
     @curve = @bezier_curve
+
+    @order_wrapper.classList.add('hidden')
+
     @update_and_draw()
 
   configure_for_spline_mode: ->
@@ -1019,6 +997,9 @@ class LERPingSplines
     @bezier_mode = false
     @spline_mode = true
     @curve = @spline_curve
+
+    @order_wrapper.classList.remove('hidden')
+
     @update_and_draw()
 
   change_mode: (mode, update_opt = true) ->

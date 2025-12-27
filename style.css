@@ -269,7 +269,6 @@ button[disabled] {
   display: block;
 }
 
-/* #points_wrapper { */
 .bbwrapper {
   display: inline-block;
   text-align: left;
@@ -279,10 +278,10 @@ button[disabled] {
   margin-bottom: 3px;
 }
 
-/* #points_label, */
-/* #add_point, */
-/* #remove_point, */
-/* #num_points { */
+.bbwrapper.hidden {
+  display: none;
+}
+
 .bbwrappeditem {
   display: inline-block;
   margin: 0;
@@ -292,13 +291,15 @@ button[disabled] {
 }
 
 #points_label,
+#order_label,
 #show_ticks_label {
   margin-right: 0.4rem;
   width: auto;
   padding-top: 3px;
 }
 
-#num_points {
+#num_points,
+#num_order {
   font-size: 16px;
   cursor: auto;
   padding-top: 3px;
@@ -307,6 +308,10 @@ button[disabled] {
 
 .buttonbox + .buttonbox {
   margin-left: 0.75rem;
+}
+
+.buttonbox.bbright + .buttonbox.bbright {
+  margin-right: 2rem;
 }
 
 .buttonbox > pre {
