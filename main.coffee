@@ -231,13 +231,20 @@ class Curve
       prev_order = order - 1
       prev = @points[prev_order]
       for j in [0..(@max_points() - order)]
+        #console.log("order=#{order} j=#{j}", prev)
+        break unless prev[j]? and prev[j+1]?
         lerp = new LERP( order, prev[j], prev[j+1] )
         @points[order][j] = lerp
         @points[order][j].generate_label(order, j)
 
   set_points: (points) ->
+    for p in points
+      p.enabled = true
+      @enabled_points += 1
+
     @points[0] = points
     @add_lerps()
+    @setup_pen()
 
   add_initial_points: (initial_points = @constructor.initial_points) ->
     margin = LERPingSplines.create_point_margin
@@ -266,6 +273,18 @@ class Curve
         return p    
     return null
 
+  setup_pen: ->
+    p = null
+    for i in [(@max_points() - 1)..1]
+      p = @points[i][0]
+      if p?.enabled
+        break
+    if p?
+      @pen = p
+      @pen.update_order_0_point_label_color()
+    else
+      APP.debug("ERROR: no pen?!")
+
   update_enabled_points: ->
     if @ui_enabled
       if @enabled_points < @max_points()
@@ -281,18 +300,7 @@ class Curve
       APP.num_points.textContent = "#{@enabled_points}"
 
     @update()
-
-    p = null
-    for i in [(@max_points() - 1)..1]
-      p = @points[i][0]
-      if p?.enabled
-        break
-    if p?
-      @pen = p
-      @pen.update_order_0_point_label_color()
-    else
-      @debug("ERROR: no pen?!")
-
+    @setup_pen()
     APP.update_algorithm()
 
   order_up_rebalance: ->
@@ -347,11 +355,11 @@ class Curve
       if p?.enabled
         break
 
-    @debug("missing pen") unless @pen?
-    if p isnt @pen
-      console.log('p',p)
-      console.log('@pen',@pen)
-    p = @pen
+    APP.debug("missing pen") unless @pen?
+    # if p isnt @pen
+      # console.log('p',p)
+      # console.log('@pen',@pen)
+    #p = @pen
 
     ctx = APP.graph_ctx
     ctx.beginPath()
@@ -649,8 +657,18 @@ class Spline extends Curve
   constructor: ->
     super
 
+    @segment_count = 0
     @segment = []
     @order = 2
+
+  log: ->
+    console.log("/// Spline State: order=#{@order} segment_count=#{@segment_count}")
+    console.log("                  points.length=#{@points.length} segment.length=#{@segment.length}")
+    console.log('points')
+    console.log(@points)
+    console.log('segments')
+    console.log(@segment)
+    console.log("\\\\\\ Spline State End")
 
   t_min: ->
     0.0
@@ -714,14 +732,14 @@ class Spline extends Curve
       @points[i] = new Point(x * APP.graph_width, y * APP.graph_height)
       @points[i].set_label( LERPingSplines.point_labels[i] )
 
-    console.log('points', @points)
     for point, index in initial_points
       pidx = (index * @order) + 1
-      console.log('pidx', pidx)
       @points[pidx].enabled = true
       @points[pidx].x = (margin + (range * point[0])) * APP.graph_widht
       @points[pidx].y = (margin + (range * point[1])) * APP.graph_height
       @points[pidx].set_label( LERPingSplines.point_labels[index] )
+      @segment_count += 1
+
       if index > 0
         for j in [1..index]
           cidx = pidx + j
@@ -733,22 +751,32 @@ class Spline extends Curve
           @points[cidx].y = pos.u
           @points[cidx].set_label( "#{prev.label}#{next.label}#{j}" )
 
+    @log()
     @rebuild_spline()
+    @log()
 
     console.log('Initial points & segments created!')
 
   rebuild_spline: ->
-    for i in [0..@max_segments]
+    console.log("rebuilding spline with up to #{@max_segments()} segmente")
+    for i in [0..@max_segments()]
       @segment[i] = new Bezier()
       @segment[i].disable_ui()
-      @segment[i].enabled = false;
-      sidx = (i * @order)
-      eidz = pidx + @order + 1
-      @segment[i].set_points( @points.slice(sidx, eidx) )
+      start_idx = (i * @order)
+      end_idx = start_idx + @order + 1
+      console.log("giving segment #{i} points #{start_idx} -> #{end_idx - 1}")
+      seg_points = @points.slice(start_idx, end_idx)
+      @segment[i].set_points( seg_points )
+      @segment[i].enabled = true;
+      for p in seg_points
+        unless p.enabled
+          @segment[i].enabled = false;
+          break
 
   call_on_each_segment: (func_name) ->
-    for i in [0..@segment_count]
-      @segment[i][func_name]()
+    for s in @segment
+      if s?.enabled
+        s[func_name]()
 
   update: ->
     @call_on_each_segment('update')

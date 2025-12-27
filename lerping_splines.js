@@ -1218,6 +1218,9 @@ class Matrix {
           var m, ref1, results1;
           results1 = [];
           for (j = m = 0, ref1 = this.max_points() - order; 0 <= ref1 ? m <= ref1 : m >= ref1; j = 0 <= ref1 ? ++m : --m) {
+            if (!((prev[j] != null) && (prev[j + 1] != null))) {
+              break;
+            }
             lerp = new LERP(order, prev[j], prev[j + 1]);
             this.points[order][j] = lerp;
             results1.push(this.points[order][j].generate_label(order, j));
@@ -1229,8 +1232,15 @@ class Matrix {
     };
 
     Curve.prototype.set_points = function(points) {
+      var l, len, p;
+      for (l = 0, len = points.length; l < len; l++) {
+        p = points[l];
+        p.enabled = true;
+        this.enabled_points += 1;
+      }
       this.points[0] = points;
-      return this.add_lerps();
+      this.add_lerps();
+      return this.setup_pen();
     };
 
     Curve.prototype.add_initial_points = function(initial_points) {
@@ -1271,8 +1281,24 @@ class Matrix {
       return null;
     };
 
-    Curve.prototype.update_enabled_points = function() {
+    Curve.prototype.setup_pen = function() {
       var i, l, p, ref;
+      p = null;
+      for (i = l = ref = this.max_points() - 1; ref <= 1 ? l <= 1 : l >= 1; i = ref <= 1 ? ++l : --l) {
+        p = this.points[i][0];
+        if (p != null ? p.enabled : void 0) {
+          break;
+        }
+      }
+      if (p != null) {
+        this.pen = p;
+        return this.pen.update_order_0_point_label_color();
+      } else {
+        return APP.debug("ERROR: no pen?!");
+      }
+    };
+
+    Curve.prototype.update_enabled_points = function() {
       if (this.ui_enabled) {
         if (this.enabled_points < this.max_points()) {
           APP.add_point_btn.disabled = false;
@@ -1287,19 +1313,7 @@ class Matrix {
         APP.num_points.textContent = "" + this.enabled_points;
       }
       this.update();
-      p = null;
-      for (i = l = ref = this.max_points() - 1; ref <= 1 ? l <= 1 : l >= 1; i = ref <= 1 ? ++l : --l) {
-        p = this.points[i][0];
-        if (p != null ? p.enabled : void 0) {
-          break;
-        }
-      }
-      if (p != null) {
-        this.pen = p;
-        this.pen.update_order_0_point_label_color();
-      } else {
-        this.debug("ERROR: no pen?!");
-      }
+      this.setup_pen();
       return APP.update_algorithm();
     };
 
@@ -1381,13 +1395,8 @@ class Matrix {
         }
       }
       if (this.pen == null) {
-        this.debug("missing pen");
+        APP.debug("missing pen");
       }
-      if (p !== this.pen) {
-        console.log('p', p);
-        console.log('@pen', this.pen);
-      }
-      p = this.pen;
       ctx = APP.graph_ctx;
       ctx.beginPath();
       ctx.strokeStyle = p.color;
@@ -1728,9 +1737,20 @@ class Matrix {
 
     function Spline() {
       Spline.__super__.constructor.apply(this, arguments);
+      this.segment_count = 0;
       this.segment = [];
       this.order = 2;
     }
+
+    Spline.prototype.log = function() {
+      console.log("/// Spline State: order=" + this.order + " segment_count=" + this.segment_count);
+      console.log("                  points.length=" + this.points.length + " segment.length=" + this.segment.length);
+      console.log('points');
+      console.log(this.points);
+      console.log('segments');
+      console.log(this.segment);
+      return console.log("\\\\\\ Spline State End");
+    };
 
     Spline.prototype.t_min = function() {
       return 0.0;
@@ -1816,15 +1836,14 @@ class Matrix {
         this.points[i] = new Point(x * APP.graph_width, y * APP.graph_height);
         this.points[i].set_label(LERPingSplines.point_labels[i]);
       }
-      console.log('points', this.points);
       for (index = m = 0, len = initial_points.length; m < len; index = ++m) {
         point = initial_points[index];
         pidx = (index * this.order) + 1;
-        console.log('pidx', pidx);
         this.points[pidx].enabled = true;
         this.points[pidx].x = (margin + (range * point[0])) * APP.graph_widht;
         this.points[pidx].y = (margin + (range * point[1])) * APP.graph_height;
         this.points[pidx].set_label(LERPingSplines.point_labels[index]);
+        this.segment_count += 1;
         if (index > 0) {
           for (j = n = 1, ref1 = index; 1 <= ref1 ? n <= ref1 : n >= ref1; j = 1 <= ref1 ? ++n : --n) {
             cidx = pidx + j;
@@ -1838,29 +1857,54 @@ class Matrix {
           }
         }
       }
+      this.log();
       this.rebuild_spline();
+      this.log();
       return console.log('Initial points & segments created!');
     };
 
     Spline.prototype.rebuild_spline = function() {
-      var eidz, i, l, ref, results, sidx;
+      var end_idx, i, l, p, ref, results, seg_points, start_idx;
+      console.log("rebuilding spline with up to " + (this.max_segments()) + " segmente");
       results = [];
-      for (i = l = 0, ref = this.max_segments; 0 <= ref ? l <= ref : l >= ref; i = 0 <= ref ? ++l : --l) {
+      for (i = l = 0, ref = this.max_segments(); 0 <= ref ? l <= ref : l >= ref; i = 0 <= ref ? ++l : --l) {
         this.segment[i] = new Bezier();
         this.segment[i].disable_ui();
-        this.segment[i].enabled = false;
-        sidx = i * this.order;
-        eidz = pidx + this.order + 1;
-        results.push(this.segment[i].set_points(this.points.slice(sidx, eidx)));
+        start_idx = i * this.order;
+        end_idx = start_idx + this.order + 1;
+        console.log("giving segment " + i + " points " + start_idx + " -> " + (end_idx - 1));
+        seg_points = this.points.slice(start_idx, end_idx);
+        this.segment[i].set_points(seg_points);
+        this.segment[i].enabled = true;
+        results.push((function() {
+          var len, m, results1;
+          results1 = [];
+          for (m = 0, len = seg_points.length; m < len; m++) {
+            p = seg_points[m];
+            if (!p.enabled) {
+              this.segment[i].enabled = false;
+              break;
+            } else {
+              results1.push(void 0);
+            }
+          }
+          return results1;
+        }).call(this));
       }
       return results;
     };
 
     Spline.prototype.call_on_each_segment = function(func_name) {
-      var i, l, ref, results;
+      var l, len, ref, results, s;
+      ref = this.segment;
       results = [];
-      for (i = l = 0, ref = this.segment_count; 0 <= ref ? l <= ref : l >= ref; i = 0 <= ref ? ++l : --l) {
-        results.push(this.segment[i][func_name]());
+      for (l = 0, len = ref.length; l < len; l++) {
+        s = ref[l];
+        if (s != null ? s.enabled : void 0) {
+          results.push(s[func_name]());
+        } else {
+          results.push(void 0);
+        }
       }
       return results;
     };
