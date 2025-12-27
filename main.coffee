@@ -204,6 +204,7 @@ class Curve
   constructor: ->
     @points = []
     @enabled_points = 0
+    @ui_enabled = true
 
     @pen_label = 'P'
     @pen_label_metrics = APP.graph_ctx.measureText(@pen_label)
@@ -215,13 +216,30 @@ class Curve
 
     @pen_label_offset_length = Vec2.magnitude(@pen_label_offset)
 
+  disable_ui: ->
+    @ui_enabled = false
+
   min_points: ->
     @constructor.min_points
 
   max_points: ->
     @constructor.max_points
 
-  add_initial_points: ->
+  add_lerps: ->
+    for order in [1..@max_points()]
+      @points[order] = []
+      prev_order = order - 1
+      prev = @points[prev_order]
+      for j in [0..(@max_points() - order)]
+        lerp = new LERP( order, prev[j], prev[j+1] )
+        @points[order][j] = lerp
+        @points[order][j].generate_label(order, j)
+
+  set_points: (points) ->
+    @points[0] = points
+    @add_lerps()
+
+  add_initial_points: (initial_points = @constructor.initial_points) ->
     margin = LERPingSplines.create_point_margin
     range = 1.0 - (2.0 * margin)
 
@@ -232,16 +250,9 @@ class Curve
       @points[0][i] = new Point(x * APP.graph_width, y * APP.graph_height)
       @points[0][i].set_label( LERPingSplines.point_labels[i] )
 
-    for order in [1..@max_points()]
-      @points[order] = []
-      prev_order = order - 1
-      prev = @points[prev_order]
-      for j in [0..(@max_points() - order)]
-        lerp = new LERP( order, prev[j], prev[j+1] )
-        @points[order][j] = lerp
-        @points[order][j].generate_label(order, j)
+    @add_lerps()
 
-    for point in @constructor.initial_points
+    for point in initial_points
       @enable_point_at( point[0], point[1] )
 
     @update_enabled_points()
@@ -256,17 +267,18 @@ class Curve
     return null
 
   update_enabled_points: ->
-    if @enabled_points < @max_points()
-      APP.add_point_btn.disabled = false
-    else
-      APP.add_point_btn.disabled = true
+    if @ui_enabled
+      if @enabled_points < @max_points()
+        APP.add_point_btn.disabled = false
+      else
+        APP.add_point_btn.disabled = true
 
-    if @enabled_points > @min_points()
-      APP.remove_point_btn.disabled = false
-    else
-      APP.remove_point_btn.disabled = true
+      if @enabled_points > @min_points()
+        APP.remove_point_btn.disabled = false
+      else
+        APP.remove_point_btn.disabled = true
 
-    APP.num_points.textContent = "#{@enabled_points}"
+      APP.num_points.textContent = "#{@enabled_points}"
 
     @update()
 
@@ -316,10 +328,15 @@ class Curve
     p.enabled = false
     @update_enabled_points()
 
+  update_at: (t) =>
+    for order in @points
+      for p in order
+        p.update(t)
+
   update: ->
     @update_at(APP.t)
 
-  draw_bezier: ->
+  draw_curve: ->
     return unless @points? and @points[0]?
 
     start = @points[0][0]
@@ -474,13 +491,19 @@ class Curve
 
 
 class Bezier extends Curve
-  @min_points: 2
+  @min_points: 3
   @max_points: 8
 
   @initial_points: [
     [ 0.06, 0.82 ],
     [ 0.72, 0.18 ]
   ]
+
+  t_min: ->
+    0.0
+
+  t_max: ->
+    1.0
 
   order_up_rebalance: ->
     cur_id = @enabled_points
@@ -610,15 +633,11 @@ class Bezier extends Curve
 
     lines.join("\n")
 
-  update_at: (t) =>
-    for order in @points
-      for p in order
-        p.update(t)
-
-
 class Spline extends Curve
-  @min_points: 2
-  @max_points: 8
+  @min_order: 1
+  @max_order: 3
+  @min_segments: 1
+  @max_segments: 4
 
   @initial_points: [
     [ 0.06, 0.82 ],
@@ -627,11 +646,148 @@ class Spline extends Curve
     [ 0.88, 0.90 ]
   ]
 
-  update_at: (t) =>
-    for order in @points
-      for p in order
-        p.update(t)
+  constructor: ->
+    super
 
+    @segment = []
+    @order = 2
+
+  t_min: ->
+    0.0
+
+  t_max: ->
+    @segment_count
+
+  set_t_segment: (value) ->
+    @t_segment = value
+
+  min_points: ->
+    @min_order() + 1
+
+  max_points: ->
+    (@max_order() * @max_segments()) + 1
+
+  current_max_points: ->
+    (@order * @segment_count) + 1
+
+  min_segments: ->
+    @constructor.min_segments
+
+  max_segments: ->
+    @constructor.max_segments
+
+  min_order: ->
+    @constructor.min_order
+
+  max_order: ->
+    @constructor.max_order
+
+  add_order: ->
+    if @order < @max_order
+      @order += 1
+      @rebuild_spline()
+
+  sub_order: ->
+    if @order > @min_order
+      @order -= 1
+      @rebuild_spline()
+
+  add_segment: ->
+    if @segment_count < @max_segments()
+      @segment_count += 1
+      @rebuild_spline()
+
+  sub_segment: ->
+    if @segment_count > @min_segments()
+      @segment_count -= 1
+      @segment[@segment_count].enabled = false
+      @rebuild_spline()
+
+  add_initial_points: (initial_points = @constructor.initial_points) ->
+    margin = LERPingSplines.create_point_margin
+    range = 1.0 - (2.0 * margin)
+    console.log('max_points', @max_points())
+    @points[0] = []
+    for i in [0..@max_points()]
+      x = margin + (range * Math.random())
+      y = margin + (range * Math.random())
+      @points[i] = new Point(x * APP.graph_width, y * APP.graph_height)
+      @points[i].set_label( LERPingSplines.point_labels[i] )
+
+    console.log('points', @points)
+    for point, index in initial_points
+      pidx = (index * @order) + 1
+      console.log('pidx', pidx)
+      @points[pidx].enabled = true
+      @points[pidx].x = (margin + (range * point[0])) * APP.graph_widht
+      @points[pidx].y = (margin + (range * point[1])) * APP.graph_height
+      @points[pidx].set_label( LERPingSplines.point_labels[index] )
+      if index > 0
+        for j in [1..index]
+          cidx = pidx + j
+          prev = @points[pidx - @order]
+          next = @points[pidx]
+          pos = Vec2.lerp(prev, next, j / @order)
+          @points[cidx].enabled = true
+          @points[cidx].x = pos.x
+          @points[cidx].y = pos.u
+          @points[cidx].set_label( "#{prev.label}#{next.label}#{j}" )
+
+    @rebuild_spline()
+
+    console.log('Initial points & segments created!')
+
+  rebuild_spline: ->
+    for i in [0..@max_segments]
+      @segment[i] = new Bezier()
+      @segment[i].disable_ui()
+      @segment[i].enabled = false;
+      sidx = (i * @order)
+      eidz = pidx + @order + 1
+      @segment[i].set_points( @points.slice(sidx, eidx) )
+
+  draw_segment: ->
+    return unless @points? and @points[0]?
+
+    start = @points[0][0]
+
+    p = null
+    for i in [(@max_points() - 1)..1]
+      p = @points[i][0]
+      if p?.enabled
+        break
+
+    @debug("missing pen") unless @pen?
+    if p isnt @pen
+      console.log('p',p)
+      console.log('@pen',@pen)
+    p = @pen
+
+    ctx = APP.graph_ctx
+    ctx.beginPath()
+    ctx.strokeStyle = p.color
+    ctx.lineWidth = 3
+
+    t = 0.0
+    @update_at(t)
+    ctx.moveTo(p.position.x, p.position.y)
+    while t < 1.0
+      t += 0.02
+      @update_at(t)
+      ctx.lineTo(p.position.x, p.position.y)
+
+    ctx.stroke()
+
+  draw_curve: ->
+
+  draw_ticks: ->
+    save_t_segment = @t_segment
+    
+    for i in [0..@segment_count]
+      @set_current_segment(i)
+      super
+
+    @t_segment = save_t_segment
 
   get_algorithm_text: ->
     ''
@@ -741,18 +897,24 @@ class LERPingSplines
     @tslider.range = @tslider.max - @tslider.min
     @tslider.handle.addEventListener('mousedown', @on_tslider_mousedown)
 
-    @reset_loop()
-
     @btn_play_pause = @find_element('button_play_pause')
     @btn_play_pause.addEventListener('click',@on_btn_play_pause_click)
 
     @num_points = @find_element('num_points')
-
+ 
     @add_point_btn = @find_element('add_point')
     @add_point_btn?.addEventListener('click', @on_add_point_btn_click)
 
     @remove_point_btn = @find_element('remove_point')
     @remove_point_btn?.addEventListener('click', @on_remove_point_btn_click)
+
+    @num_order = @find_element('num_order')
+
+    @add_order_btn = @find_element('add_order')
+    @add_order_btn?.addEventListener('click', @on_add_order_btn_click)
+
+    @sub_order_btn = @find_element('sub_order')
+    @sub_order_btn?.addEventListener('click', @on_sub_order_btn_click)
 
     @algorithmbox   = @find_element('algorithmbox')
     @algorithm_text = @find_element('algorithm_text')
@@ -761,6 +923,8 @@ class LERPingSplines
     @spline_curve.add_initial_points()
 
     @option.mode.change()
+
+    @reset_loop()
 
     @context.addEventListener('mousemove', @on_mousemove)
     @context.addEventListener('mousedown', @on_mousedown)
@@ -892,6 +1056,14 @@ class LERPingSplines
     @curve.disable_point()
     @update_and_draw()
 
+  on_add_order_btn_click: (event, ui) =>
+    @curve.add_order()
+    @update_and_draw()
+
+  on_sub_order_btn_click: (event, ui) =>
+    @curve.sub_order()
+    @update_and_draw()
+
   on_btn_play_pause_click: (event, ui) =>
     if @running
       @stop()
@@ -925,15 +1097,22 @@ class LERPingSplines
 
   set_t: (value) ->
     @t = value
-    @t -= 1.0 while @t > 1.0
+    if @t > 0
+      if @spline_mode
+        @curve.set_t_segment(Math.floor(@t))
+        @t = @t - @curve.t_segment
+      else
+        max = @curve.t_max()
+        @t -= max while @t > max
+
     @tvar.textContent = (@t.toFixed(2))
 
-    if @t == 0.0
+    if @t == @curve.t_min()
       @tslider_btn_min.disabled = true
     else
       @tslider_btn_min.disabled = false
 
-    if @t == 1.0
+    if @t == @curve.t_max()
       @tslider_btn_max.disabled = true
     else
       @tslider_btn_max.disabled = false
@@ -1070,7 +1249,7 @@ class LERPingSplines
   update_and_draw: ->
     @graph_ctx.clearRect(0, 0, @graph_canvas.width, @graph_canvas.height)
     @curve.draw_ticks() if @option.show_ticks.value
-    @curve.draw_bezier()
+    @curve.draw_curve()
     @update()
     @curve.draw()
     @curve.draw_pen() if @option.show_pen_label.value
