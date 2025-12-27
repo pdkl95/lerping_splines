@@ -370,7 +370,6 @@ class Matrix {
       this.on_input = bind(this.on_input, this);
       this.on_change = bind(this.on_change, this);
       if (this.id instanceof Element) {
-        this.el = this.id;
         this.id = this.el.id;
       } else {
         this.el = window.APP.context.getElementById(this.id);
@@ -785,6 +784,139 @@ class Matrix {
 
   })(UI.Option);
 
+  UI.ChoiceOption = (function(superClass) {
+    extend(ChoiceOption, superClass);
+
+    function ChoiceOption(group_class, default_value, callback) {
+      var ref, stored_value;
+      this.group_class = group_class;
+      if (default_value == null) {
+        default_value = null;
+      }
+      this.callback = callback != null ? callback : {};
+      this.on_choice_click = bind(this.on_choice_click, this);
+      this.setup_choice = bind(this.setup_choice, this);
+      this.group_selector = "." + this.group_class;
+      this.el_list = window.APP.context.querySelectorAll(this.group_selector);
+      if (!(((ref = this.el_list) != null ? ref.length : void 0) > 0)) {
+        console.log("ERROR - could not find with class \"" + this.name + "\"");
+      }
+      this.persist = true;
+      this.storage_id = "ui_option-" + this.group_class;
+      this.el_list.forEach(this.setup_choice);
+      if (default_value != null) {
+        this["default"] = default_value;
+      } else {
+        this["default"] = this.detect_default_value();
+      }
+      stored_value = APP.storage_get(this.storage_id);
+      if (stored_value != null) {
+        this.set(stored_value);
+      } else {
+        this.set(this["default"]);
+      }
+    }
+
+    ChoiceOption.prototype.detect_default_value = function() {
+      return this.el_list[0].dataset.value;
+    };
+
+    ChoiceOption.prototype.setup_choice = function(el) {
+      return el.addEventListener('click', this.on_choice_click);
+    };
+
+    ChoiceOption.prototype.on_choice_click = function(event) {
+      return this.set(event.target.dataset.value);
+    };
+
+    ChoiceOption.prototype.setup_listeners = function() {};
+
+    ChoiceOption.prototype.set_value = function(new_value) {
+      var base, old_value;
+      if (new_value == null) {
+        new_value = null;
+      }
+      if (new_value != null) {
+        old_value = this.value;
+        this.value = new_value;
+        if (old_value !== new_value) {
+          if (typeof (base = this.callback).on_change === "function") {
+            base.on_change(this.value);
+          }
+        }
+      } else {
+        console.log("set_value(null) called for UI.ChoiceOption \"" + this.group_class + "\'");
+      }
+      if (this.persist) {
+        return APP.storage_set(this.storage_id, this.value, this["default"]);
+      }
+    };
+
+    ChoiceOption.prototype.get_element_with_value = function(value) {
+      var el, l, len, ref;
+      ref = this.el_list;
+      for (l = 0, len = ref.length; l < len; l++) {
+        el = ref[l];
+        if (el.dataset.value === value) {
+          return el;
+        }
+      }
+      return null;
+    };
+
+    ChoiceOption.prototype.clear_selected = function() {
+      var el, l, len, ref, results;
+      ref = this.el_list;
+      results = [];
+      for (l = 0, len = ref.length; l < len; l++) {
+        el = ref[l];
+        results.push(el.classList.remove('selected'));
+      }
+      return results;
+    };
+
+    ChoiceOption.prototype.get = function() {
+      return this.value;
+    };
+
+    ChoiceOption.prototype.set = function(new_value, update_element) {
+      var el;
+      if (update_element == null) {
+        update_element = true;
+      }
+      el = this.get_element_with_value(new_value);
+      if (el != null) {
+        this.set_value(new_value);
+        if (update_element) {
+          this.clear_selected();
+          return el.classList.add('selected');
+        }
+      } else {
+        return console.log("Invalid value \"" + new_value + "\" for UI.ChoiceOption \"" + this.group_class + "\'");
+      }
+    };
+
+    ChoiceOption.prototype.change = function() {
+      var base;
+      return typeof (base = this.callback).on_change === "function" ? base.on_change(this.value) : void 0;
+    };
+
+    ChoiceOption.prototype.enable = function() {
+      return this.el_list.forEach(function(el) {
+        return el.classList.remove('disabled');
+      });
+    };
+
+    ChoiceOption.prototype.disable = function() {
+      return this.el_list.forEach(function(el) {
+        return el.classList.add('disabled');
+      });
+    };
+
+    return ChoiceOption;
+
+  })(UI.Option);
+
   UI.ColorOption = (function(superClass) {
     extend(ColorOption, superClass);
 
@@ -1078,6 +1210,8 @@ class Matrix {
       this.update_callback = bind(this.update_callback, this);
       this.update = bind(this.update, this);
       this.update_at = bind(this.update_at, this);
+      this.update_spline_mode_at = bind(this.update_spline_mode_at, this);
+      this.update_bezier_mode_at = bind(this.update_bezier_mode_at, this);
       this.redraw_ui = bind(this.redraw_ui, this);
       this.on_mouseup = bind(this.on_mouseup, this);
       this.on_mouseup_canvas = bind(this.on_mouseup_canvas, this);
@@ -1101,6 +1235,7 @@ class Matrix {
       this.on_pen_label_change = bind(this.on_pen_label_change, this);
       this.on_show_ticks_change = bind(this.on_show_ticks_change, this);
       this.on_show_tooltips_change = bind(this.on_show_tooltips_change, this);
+      this.on_mode_change = bind(this.on_mode_change, this);
     }
 
     LERPingSplines.prototype.init = function() {
@@ -1118,7 +1253,8 @@ class Matrix {
         alt_algorithm_names: new UI.BoolOption('alt_algorithm_names', true),
         rebalance_points_on_order_up: new UI.BoolOption('rebalance_points_on_order_up', false),
         rebalance_points_on_order_down: new UI.BoolOption('rebalance_points_on_order_down', false),
-        show_tooltips: new UI.BoolOption('show_tooltips', true)
+        show_tooltips: new UI.BoolOption('show_tooltips', true),
+        mode: new UI.ChoiceOption('mode_choice', 'bezier')
       };
       this.option.show_ticks.register_callback({
         on_change: this.on_show_ticks_change
@@ -1133,6 +1269,11 @@ class Matrix {
         on_true: this.on_show_algorithm_true,
         on_false: this.on_show_algorithm_false
       });
+      this.option.mode.register_callback({
+        on_change: this.on_mode_change
+      });
+      this.bezier_mode = false;
+      this.spline_mode = false;
       this.graph_wrapper = this.find_element('graph_wrapper');
       this.graph_canvas = this.find_element('graph');
       this.graph_ctx = this.graph_canvas.getContext('2d', {
@@ -1198,13 +1339,16 @@ class Matrix {
       this.algorithmbox = this.find_element('algorithmbox');
       this.algorithm_text = this.find_element('algorithm_text');
       console.log('init() completed!');
+      this.option.mode.change();
       this.add_initial_points();
       this.update();
-      return this.stop();
+      this.stop();
+      return this.debug("Ready!");
     };
 
     LERPingSplines.prototype.debug = function(msg_text) {
       var hdr, line, msg, timestamp;
+      console.log(msg_text);
       if (this.debugbox == null) {
         this.debugbox = this.context.getElementById('debugbox');
         this.debugbox.classList.remove('hidden');
@@ -1224,6 +1368,12 @@ class Matrix {
       line.appendChild(hdr);
       line.appendChild(msg);
       return this.debugbox.appendChild(line);
+    };
+
+    LERPingSplines.prototype.fatal_error = function(msg) {
+      this.runhing = false;
+      msg = "FATAL ERROR: " + msg;
+      return this.debug(msg);
     };
 
     LERPingSplines.prototype.create_element = function(tag_name, opt) {
@@ -1325,6 +1475,9 @@ class Matrix {
 
     LERPingSplines.prototype.find_point = function(x, y) {
       var l, len, p, ref;
+      if (!((this.points != null) && (this.points[0] != null))) {
+        return null;
+      }
       ref = this.points[0];
       for (l = 0, len = ref.length; l < len; l++) {
         p = ref[l];
@@ -1476,6 +1629,41 @@ class Matrix {
       p = this.points[0][this.enabled_points];
       p.enabled = false;
       return this.update_enabled_points();
+    };
+
+    LERPingSplines.prototype.configure_for_bezier_mode = function() {
+      console.log("configure for mode: bezier");
+      this.bezier_mode = true;
+      this.spline_mode = false;
+      return this.update_and_draw();
+    };
+
+    LERPingSplines.prototype.configure_for_spline_mode = function() {
+      console.log("configure for mode: spline");
+      this.bezier_mode = false;
+      this.spline_mode = true;
+      return this.update_and_draw();
+    };
+
+    LERPingSplines.prototype.change_mode = function(mode, update_opt) {
+      if (update_opt == null) {
+        update_opt = true;
+      }
+      if (update_opt) {
+        this.option.mode.set(mode);
+      }
+      switch (mode) {
+        case 'bezier':
+          return this.configure_for_bezier_mode();
+        case 'spline':
+          return this.configure_for_spline_mode();
+        default:
+          return this.fatal_error("bad mode name \"" + mode + "\"");
+      }
+    };
+
+    LERPingSplines.prototype.on_mode_change = function() {
+      return this.change_mode(this.option.mode.get(), false);
     };
 
     LERPingSplines.prototype.on_show_tooltips_change = function(event) {
@@ -1803,7 +1991,7 @@ class Matrix {
       return null;
     };
 
-    LERPingSplines.prototype.update_at = function(t) {
+    LERPingSplines.prototype.update_bezier_mode_at = function(t) {
       var l, len, order, p, ref, results;
       ref = this.points;
       results = [];
@@ -1822,12 +2010,27 @@ class Matrix {
       return results;
     };
 
+    LERPingSplines.prototype.update_spline_mode_at = function(t) {};
+
+    LERPingSplines.prototype.update_at = function(t) {
+      if (this.bezier_mode) {
+        return this.update_bezier_mode_at(t);
+      } else if (this.spline_mode) {
+        return this.update_spline_mode_at(t);
+      } else {
+        return this.fatal_error("no mode set during update() running=" + this.running);
+      }
+    };
+
     LERPingSplines.prototype.update = function() {
       return this.update_at(this.t);
     };
 
     LERPingSplines.prototype.draw_bezier = function() {
       var ctx, i, l, p, ref, start, t;
+      if (!((this.points != null) && (this.points[0] != null))) {
+        return;
+      }
       start = this.points[0][0];
       p = null;
       for (i = l = ref = LERPingSplines.max_points - 1; ref <= 1 ? l <= 1 : l >= 1; i = ref <= 1 ? ++l : --l) {
@@ -1861,6 +2064,9 @@ class Matrix {
 
     LERPingSplines.prototype.draw = function() {
       var l, len, len1, len2, len3, m, n, o, order, p, ref, ref1, ref2, results;
+      if (!((this.points != null) && (this.points[0] != null))) {
+        return;
+      }
       ref = this.points;
       for (l = 0, len = ref.length; l < len; l++) {
         order = ref[l];
@@ -2028,9 +2234,11 @@ class Matrix {
     };
 
     LERPingSplines.prototype.schedule_next_frame = function() {
-      if (!this.frame_is_scheduled) {
-        this.frame_is_scheduled = true;
-        window.requestAnimationFrame(this.update_callback);
+      if (this.running) {
+        if (!this.frame_is_scheduled) {
+          this.frame_is_scheduled = true;
+          window.requestAnimationFrame(this.update_callback);
+        }
       }
       return null;
     };
@@ -2043,8 +2251,10 @@ class Matrix {
     };
 
     LERPingSplines.prototype.schedule_first_frame = function() {
-      this.frame_is_scheduled = true;
-      window.requestAnimationFrame(this.first_update_callback);
+      if (this.running) {
+        this.frame_is_scheduled = true;
+        window.requestAnimationFrame(this.first_update_callback);
+      }
       return null;
     };
 

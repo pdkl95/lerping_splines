@@ -241,6 +241,7 @@ class LERPingSplines
       rebalance_points_on_order_up:    new UI.BoolOption('rebalance_points_on_order_up', false)
       rebalance_points_on_order_down:  new UI.BoolOption('rebalance_points_on_order_down', false)
       show_tooltips:                   new UI.BoolOption('show_tooltips', true)
+      mode:                            new UI.ChoiceOption('mode_choice', 'bezier')
 
     @option.show_ticks.register_callback
       on_change: @on_show_ticks_change
@@ -254,6 +255,12 @@ class LERPingSplines
     @option.show_algorithm.register_callback
       on_true:  @on_show_algorithm_true
       on_false: @on_show_algorithm_false
+
+    @option.mode.register_callback
+      on_change: @on_mode_change
+
+    @bezier_mode = false
+    @spline_mode = false
 
     @graph_wrapper   = @find_element('graph_wrapper')
     @graph_canvas    = @find_element('graph')
@@ -334,13 +341,16 @@ class LERPingSplines
 
     console.log('init() completed!')
 
+    @option.mode.change()
+
     @add_initial_points()
     @update()
     @stop()
 
-    #@debug("Ready!")
+    @debug("Ready!")
 
   debug: (msg_text) ->
+    console.log(msg_text)
     unless @debugbox?
       @debugbox = @context.getElementById('debugbox')
       @debugbox.classList.remove('hidden')
@@ -359,6 +369,11 @@ class LERPingSplines
 
     #@debugbox.animate({ scrollTop: @debugbox.prop("scrollHeight")}, 600);
     #@debugbox.scrollTop = @debugbox.scrollHeight
+
+  fatal_error: (msg) ->
+    @runhing = false
+    msg = "FATAL ERROR: #{msg}"
+    @debug(msg)
 
   create_element: (tag_name, opt = {}) ->
     el = @context.createElement(tag_name)
@@ -434,6 +449,7 @@ class LERPingSplines
     console.log('Initial points created!')
 
   find_point: (x, y) ->
+    return null unless @points? and @points[0]?
     for p in @points[0]
       if p?.contains(x, y)
         return p    
@@ -569,6 +585,30 @@ class LERPingSplines
     p = @points[0][@enabled_points]
     p.enabled = false
     @update_enabled_points()
+
+  configure_for_bezier_mode: ->
+    console.log("configure for mode: bezier")
+    @bezier_mode = true
+    @spline_mode = false
+    @update_and_draw()
+
+  configure_for_spline_mode: ->
+    console.log("configure for mode: spline")
+    @bezier_mode = false
+    @spline_mode = true
+    @update_and_draw()
+
+  change_mode: (mode, update_opt = true) ->
+    @option.mode.set(mode) if update_opt
+
+    switch mode
+      when 'bezier' then @configure_for_bezier_mode()
+      when 'spline' then @configure_for_spline_mode()
+      else
+        @fatal_error("bad mode name \"#{mode}\"")
+
+  on_mode_change: =>
+    @change_mode(@option.mode.get(), false)
 
   on_show_tooltips_change: (event) =>
     if @show_tooltips.checked
@@ -808,15 +848,27 @@ class LERPingSplines
 
     return null
 
-  update_at: (t) =>
+  update_bezier_mode_at: (t) =>
     for order in @points
       for p in order
         p.update(t)
+
+  update_spline_mode_at: (t) =>
+
+  update_at: (t) =>
+    if @bezier_mode
+      @update_bezier_mode_at(t)
+    else if @spline_mode
+      @update_spline_mode_at(t)
+    else
+      @fatal_error("no mode set during update() running=#{@running}")
 
   update: =>
     @update_at(@t)
 
   draw_bezier: ->
+    return unless @points? and @points[0]?
+
     start = @points[0][0]
 
     p = null
@@ -847,6 +899,8 @@ class LERPingSplines
     ctx.stroke()
 
   draw: ->
+    return unless @points? and @points[0]?
+
     for order in @points
       for p in order
         if p.order > 1
@@ -986,9 +1040,10 @@ class LERPingSplines
     return null
  
   schedule_next_frame: =>
-    unless @frame_is_scheduled
-      @frame_is_scheduled = true
-      window.requestAnimationFrame(@update_callback)
+    if @running
+      unless @frame_is_scheduled
+        @frame_is_scheduled = true
+        window.requestAnimationFrame(@update_callback)
     return null
 
   first_update_callback: (timestamp) =>
@@ -998,8 +1053,9 @@ class LERPingSplines
     @schedule_next_frame()
    
   schedule_first_frame: =>
-    @frame_is_scheduled = true
-    window.requestAnimationFrame(@first_update_callback)
+    if @running
+      @frame_is_scheduled = true
+      window.requestAnimationFrame(@first_update_callback)
     return null
 
 document.addEventListener 'DOMContentLoaded', =>

@@ -1,6 +1,6 @@
 window.UI or= {}
 class UI.Option
-  @create_input_element: (type = null, id = null) ->
+  @create_input_element: (type = null, id = null) =>
     el = window.APP.context.createElement('input')
     el.id = id if id?
     el.type = type if type?
@@ -8,7 +8,6 @@ class UI.Option
 
   constructor: (@id, default_value = null, @callback = {}) ->
     if @id instanceof Element
-      @el = @id
       @id = @el.id
     else
       @el = window.APP.context.getElementById(@id)
@@ -45,6 +44,7 @@ class UI.Option
   reset: ->
     APP.storage_remove(@storage_id)
     @set(@default)
+
   register_callback: (opt = {}) ->
     for name, func of opt
       @callback[name] = func
@@ -222,6 +222,84 @@ class UI.SelectOption extends UI.Option
     @el.add(opt, null)
     opt.selected = true if selected
     @set(@get())
+
+class UI.ChoiceOption extends UI.Option
+  constructor: (@group_class, default_value = null, @callback = {}) ->
+    @group_selector = ".#{@group_class}"
+    @el_list = window.APP.context.querySelectorAll(@group_selector)
+    unless @el_list?.length > 0
+        console.log("ERROR - could not find with class \"#{@name}\"")
+
+    @persist = true
+    @storage_id = "ui_option-#{@group_class}"
+
+    @el_list.forEach(@setup_choice)
+
+    if default_value?
+      @default = default_value
+    else
+      @default = @detect_default_value()
+
+    stored_value = APP.storage_get(@storage_id)
+    if stored_value?
+      @set(stored_value)
+    else
+      @set(@default)
+
+  detect_default_value: ->
+    @el_list[0].dataset.value
+
+  setup_choice: (el) =>
+    el.addEventListener('click', @on_choice_click);
+
+  on_choice_click: (event) =>
+    @set(event.target.dataset.value)
+
+  setup_listeners: ->
+
+  set_value: (new_value = null) ->
+    if new_value?
+      old_value = @value
+      @value = new_value
+      if old_value != new_value
+        @callback.on_change?(@value)
+    else
+      console.log("set_value(null) called for UI.ChoiceOption \"#{@group_class}\'")
+
+    if @persist
+      APP.storage_set(@storage_id, @value, @default)
+
+  get_element_with_value: (value) ->
+    for el in @el_list
+      if el.dataset.value == value
+        return el
+    return null
+
+  clear_selected: ->
+    for el in @el_list
+      el.classList.remove('selected')
+
+  get: ->
+    @value
+
+  set: (new_value, update_element = true) ->
+    el = @get_element_with_value(new_value)
+    if el?
+      @set_value(new_value)
+      if update_element
+        @clear_selected()
+        el.classList.add('selected')
+    else
+      console.log("Invalid value \"#{new_value}\" for UI.ChoiceOption \"#{@group_class}\'")
+
+  change: ->
+    @callback.on_change?(@value)
+
+  enable: ->
+    @el_list.forEach( (el) -> el.classList.remove('disabled') )
+
+  disable: ->
+    @el_list.forEach( (el) -> el.classList.add('disabled') )
 
 class UI.ColorOption extends UI.Option
   get: (element = @el) ->

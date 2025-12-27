@@ -438,7 +438,8 @@ button[disabled] {
 }
 
 #alg_opt_tabs_algorithm_input:checked + .tab,
-#alg_opt_tabs_options_input:checked + .tab {
+#alg_opt_tabs_options_input:checked + .tab,
+#alg_opt_tabs_mode_input:checked + .tab {
   background-color: #ccc;
   border-top-style: inset;
   border-left-style: inset;
@@ -448,7 +449,8 @@ button[disabled] {
 }
 
 #alg_opt_tabs_algorithm_input:checked:hover + .tab,
-#alg_opt_tabs_options_input:checked:hover + .tab {
+#alg_opt_tabs_options_input:checked:hover + .tab,
+#alg_opt_tabs_mode_input:checked:hover + .tab {
   background-color: #ccc;
   border-top-style: inset;
   border-left-style: inset;
@@ -494,19 +496,8 @@ button[disabled] {
   margin-left: 2rem;
 }
 
-.choice_wrapper > .choice {
+.choice_wrapper .choice {
   float: left;
-}
-
-.choice_wrapper [type="radio"] {
-  display: none;
-}
-
-.choice_wrapper > .choice + .choice {
-  margin-left: 1rem;
-}
-
-.choice_wrapper .choice_btn {
   background-color: #EDC5B5;
   border: 2px dashed #F9A483;
   border-radius: 6px;
@@ -517,14 +508,36 @@ button[disabled] {
   text-align: center;
 }
 
-.choice_wrapper .choice_btn:hover {
-  border-style: solid;
-  border-radius: 0;
+.choice_wrapper > .choice + .choice {
+  margin-left: 1rem;
 }
 
-.choice_wrapper [type="radio"]:checked + .choice_btn {
+.choice_wrapper .choice:hover {
+  border-style: solid;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.choice_wrapper .choice.selected {
   background-color: #BDEDB5;
   border-color: #5FEB47
+}
+
+.choice_wrapper .choice.selected:hover {
+  cursor: default;
+}
+
+.choice_wrapper .choice.disabled,
+.choice_wrapper .choice.disabled.selected {
+  background-color: #bbb;
+  border-color: #999;
+  color: #555;
+
+}
+
+.choice_wrapper .choice.disabled:hover,
+.choice_wrapper .choice.disabled.selected:hover {
+  cursor: default;
 }
 
 .bool_option_state {
@@ -532,6 +545,7 @@ button[disabled] {
   padding-top: 2px;
   padding-bottom: 2px;
   text-align: center;
+  cursor: pointer;
 }
 
 .bool_option_state.on {
