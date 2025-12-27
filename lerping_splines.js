@@ -1,5 +1,5 @@
 (function() {
-  var Color, LERP, LERPingSplines, Point, TAU, Vec2, clone,
+  var Bezier, Color, Curve, LERP, LERPingSplines, Point, Spline, TAU, Vec2, clone,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
@@ -1152,6 +1152,9 @@ class Matrix {
 
     LERP.prototype.update_order_0_point_label_color = function() {
       var color, hsv, l, len, p, ref, results, rgb;
+      if (APP.points == null) {
+        return;
+      }
       rgb = Color.hex2rgb(this.color);
       hsv = Color.rgb2hsv(rgb[0], rgb[1], rgb[2]);
       hsv[0] += 0.7;
@@ -1175,15 +1178,549 @@ class Matrix {
 
   })(Point);
 
-  LERPingSplines = (function() {
-    LERPingSplines.min_points = 2;
+  Curve = (function() {
+    function Curve() {
+      this.points = [];
+      this.enabled_points = 0;
+      this.pen_label = 'P';
+      this.pen_label_metrics = APP.graph_ctx.measureText(this.pen_label);
+      this.pen_label_width = this.pen_label_metrics.width;
+      this.pen_label_height = LERPingSplines.pen_label_height;
+      this.pen_label_offset = {
+        x: this.pen_label_width / 2,
+        y: this.pen_label_height / 2
+      };
+      this.pen_label_offset_length = Vec2.magnitude(this.pen_label_offset);
+    }
 
-    LERPingSplines.max_points = 8;
-
-    LERPingSplines.max_lerp_order = function() {
-      return LERPingSplines.max_points - 1;
+    Curve.prototype.min_points = function() {
+      return this.constructor.min_points;
     };
 
+    Curve.prototype.max_points = function() {
+      return this.constructor.max_points;
+    };
+
+    Curve.prototype.add_initial_points = function() {
+      var i, j, l, len, lerp, m, margin, n, o, order, point, prev, prev_order, range, ref, ref1, ref2, ref3, x, y;
+      margin = LERPingSplines.create_point_margin;
+      range = 1.0 - (2.0 * margin);
+      this.points[0] = [];
+      for (i = l = 0, ref = this.max_points(); 0 <= ref ? l <= ref : l >= ref; i = 0 <= ref ? ++l : --l) {
+        x = margin + (range * Math.random());
+        y = margin + (range * Math.random());
+        this.points[0][i] = new Point(x * APP.graph_width, y * APP.graph_height);
+        this.points[0][i].set_label(LERPingSplines.point_labels[i]);
+      }
+      for (order = m = 1, ref1 = this.max_points(); 1 <= ref1 ? m <= ref1 : m >= ref1; order = 1 <= ref1 ? ++m : --m) {
+        this.points[order] = [];
+        prev_order = order - 1;
+        prev = this.points[prev_order];
+        for (j = n = 0, ref2 = this.max_points() - order; 0 <= ref2 ? n <= ref2 : n >= ref2; j = 0 <= ref2 ? ++n : --n) {
+          lerp = new LERP(order, prev[j], prev[j + 1]);
+          this.points[order][j] = lerp;
+          this.points[order][j].generate_label(order, j);
+        }
+      }
+      ref3 = this.constructor.initial_points;
+      for (o = 0, len = ref3.length; o < len; o++) {
+        point = ref3[o];
+        this.enable_point_at(point[0], point[1]);
+      }
+      this.update_enabled_points();
+      return console.log('Initial points created!');
+    };
+
+    Curve.prototype.find_point = function(x, y) {
+      var l, len, p, ref;
+      if (!((this.points != null) && (this.points[0] != null))) {
+        return null;
+      }
+      ref = this.points[0];
+      for (l = 0, len = ref.length; l < len; l++) {
+        p = ref[l];
+        if (p != null ? p.contains(x, y) : void 0) {
+          return p;
+        }
+      }
+      return null;
+    };
+
+    Curve.prototype.update_enabled_points = function() {
+      var i, l, p, ref;
+      if (this.enabled_points < this.max_points()) {
+        APP.add_point_btn.disabled = false;
+      } else {
+        APP.add_point_btn.disabled = true;
+      }
+      if (this.enabled_points > this.min_points()) {
+        APP.remove_point_btn.disabled = false;
+      } else {
+        APP.remove_point_btn.disabled = true;
+      }
+      APP.num_points.textContent = "" + this.enabled_points;
+      this.update();
+      p = null;
+      for (i = l = ref = this.max_points() - 1; ref <= 1 ? l <= 1 : l >= 1; i = ref <= 1 ? ++l : --l) {
+        p = this.points[i][0];
+        if (p != null ? p.enabled : void 0) {
+          break;
+        }
+      }
+      if (p != null) {
+        this.pen = p;
+        this.pen.update_order_0_point_label_color();
+      } else {
+        this.debug("ERROR: no pen?!");
+      }
+      return APP.update_algorithm();
+    };
+
+    Curve.prototype.order_up_rebalance = function() {};
+
+    Curve.prototype.enable_point = function(rebalance_points) {
+      var p;
+      if (this.enabled_points >= this.max_points()) {
+        return;
+      }
+      p = this.points[0][this.enabled_points];
+      if (rebalance_points && APP.option.rebalance_points_on_order_up.value) {
+        this.order_up_rebalance();
+      }
+      p.enabled = true;
+      this.enabled_points += 1;
+      this.update_enabled_points();
+      return p;
+    };
+
+    Curve.prototype.enable_point_at = function(x, y) {
+      var p;
+      p = this.enable_point(false);
+      p.x = x * APP.graph_width;
+      p.y = y * APP.graph_height;
+      return p;
+    };
+
+    Curve.prototype.compute_lower_order_curve = function() {};
+
+    Curve.prototype.disable_point = function() {
+      var p;
+      if (this.enabled_points <= this.min_points()) {
+        return;
+      }
+      if (this.enabled_points > 3 && APP.option.rebalance_points_on_order_down.value) {
+        this.compute_lower_order_curve();
+      }
+      this.enabled_points -= 1;
+      p = this.points[0][this.enabled_points];
+      p.enabled = false;
+      return this.update_enabled_points();
+    };
+
+    Curve.prototype.update = function() {
+      return this.update_at(APP.t);
+    };
+
+    Curve.prototype.draw_bezier = function() {
+      var ctx, i, l, p, ref, start, t;
+      if (!((this.points != null) && (this.points[0] != null))) {
+        return;
+      }
+      start = this.points[0][0];
+      p = null;
+      for (i = l = ref = this.max_points() - 1; ref <= 1 ? l <= 1 : l >= 1; i = ref <= 1 ? ++l : --l) {
+        p = this.points[i][0];
+        if (p != null ? p.enabled : void 0) {
+          break;
+        }
+      }
+      if (this.pen == null) {
+        this.debug("missing pen");
+      }
+      if (p !== this.pen) {
+        console.log('p', p);
+        console.log('@pen', this.pen);
+      }
+      p = this.pen;
+      ctx = APP.graph_ctx;
+      ctx.beginPath();
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 3;
+      t = 0.0;
+      this.update_at(t);
+      ctx.moveTo(p.position.x, p.position.y);
+      while (t < 1.0) {
+        t += 0.02;
+        this.update_at(t);
+        ctx.lineTo(p.position.x, p.position.y);
+      }
+      return ctx.stroke();
+    };
+
+    Curve.prototype.draw = function() {
+      var l, len, len1, len2, len3, m, n, o, order, p, ref, ref1, ref2, results;
+      if (!((this.points != null) && (this.points[0] != null))) {
+        return;
+      }
+      ref = this.points;
+      for (l = 0, len = ref.length; l < len; l++) {
+        order = ref[l];
+        for (m = 0, len1 = order.length; m < len1; m++) {
+          p = order[m];
+          if (p.order > 1) {
+            p.draw();
+          }
+        }
+      }
+      ref1 = this.points[1];
+      for (n = 0, len2 = ref1.length; n < len2; n++) {
+        p = ref1[n];
+        p.draw();
+      }
+      ref2 = this.points[0];
+      results = [];
+      for (o = 0, len3 = ref2.length; o < len3; o++) {
+        p = ref2[o];
+        results.push(p.draw());
+      }
+      return results;
+    };
+
+    Curve.prototype.get_normal = function() {
+      var normal;
+      this.update_at(this.t - this.t_step);
+      this.pen.prev_position.x = this.pen.position.x;
+      this.pen.prev_position.y = this.pen.position.y;
+      this.update();
+      if ((this.pen.prev_position.x != null) && (this.pen.prev_position.y != null)) {
+        normal = {
+          x: -(this.pen.position.y - this.pen.prev_position.y),
+          y: this.pen.position.x - this.pen.prev_position.x
+        };
+        return Vec2.normalize(normal);
+      } else {
+        return null;
+      }
+    };
+
+    Curve.prototype.draw_pen = function() {
+      var angle, arrow, arrow_shaft, arrow_side1, arrow_side2, arrowtip, ctx, normal, plabel_offset, plx, ply;
+      if (this.pen == null) {
+        return;
+      }
+      normal = this.get_normal();
+      if (normal != null) {
+        arrow = Vec2.scale(normal, 22.0);
+        arrowtip = Vec2.scale(normal, 15.0);
+        arrow_shaft = Vec2.scale(normal, 65.0);
+        angle = TAU / 8.0;
+        arrow_side1 = Vec2.rotate(arrow, angle);
+        arrow_side2 = Vec2.rotate(arrow, -angle);
+        arrowtip.x += this.pen.position.x;
+        arrowtip.y += this.pen.position.y;
+        ctx = APP.graph_ctx;
+        ctx.beginPath();
+        ctx.moveTo(arrowtip.x, arrowtip.y);
+        ctx.lineTo(arrowtip.x + arrow_shaft.x, arrowtip.y + arrow_shaft.y);
+        ctx.moveTo(arrowtip.x, arrowtip.y);
+        ctx.lineTo(arrowtip.x + arrow_side1.x, arrowtip.y + arrow_side1.y);
+        ctx.moveTo(arrowtip.x, arrowtip.y);
+        ctx.lineTo(arrowtip.x + arrow_side2.x, arrowtip.y + arrow_side2.y);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.lineCap = "round";
+        ctx.stroke();
+        plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), this.pen_label_offset_length + 3);
+        plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - this.pen_label_offset.x;
+        ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - this.pen_label_offset.y + this.pen_label_height;
+        ctx.fillStyle = '#000';
+        return ctx.fillText(this.pen_label, plx, ply);
+      }
+    };
+
+    Curve.prototype.draw_tick_at = function(t, size) {
+      var ctx, normal, point_a_x, point_a_y, point_b_x, point_b_y, t_save;
+      if (this.pen == null) {
+        return;
+      }
+      t_save = this.t;
+      this.t = t;
+      normal = this.get_normal();
+      if (normal != null) {
+        normal = Vec2.scale(normal, 3 + (4.0 * size));
+        point_a_x = this.pen.position.x + normal.x;
+        point_a_y = this.pen.position.y + normal.y;
+        point_b_x = this.pen.position.x - normal.x;
+        point_b_y = this.pen.position.y - normal.y;
+        ctx = APP.graph_ctx;
+        ctx.beginPath();
+        ctx.moveTo(point_a_x, point_a_y);
+        ctx.lineTo(point_b_x, point_b_y);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = size > 3 ? 2 : 1;
+        ctx.stroke();
+      }
+      return this.t = t_save;
+    };
+
+    Curve.prototype.draw_ticks = function() {
+      this.draw_tick_at(0.0, 5);
+      this.draw_tick_at(0.03125, 1);
+      this.draw_tick_at(0.0625, 2);
+      this.draw_tick_at(0.09375, 1);
+      this.draw_tick_at(0.125, 3);
+      this.draw_tick_at(0.15625, 1);
+      this.draw_tick_at(0.1875, 2);
+      this.draw_tick_at(0.21875, 1);
+      this.draw_tick_at(0.25, 4);
+      this.draw_tick_at(0.28125, 1);
+      this.draw_tick_at(0.3125, 2);
+      this.draw_tick_at(0.34375, 1);
+      this.draw_tick_at(0.375, 3);
+      this.draw_tick_at(0.40625, 1);
+      this.draw_tick_at(0.4375, 2);
+      this.draw_tick_at(0.46875, 1);
+      this.draw_tick_at(0.5, 5);
+      this.draw_tick_at(0.53125, 1);
+      this.draw_tick_at(0.5625, 2);
+      this.draw_tick_at(0.59375, 1);
+      this.draw_tick_at(0.625, 3);
+      this.draw_tick_at(0.65625, 1);
+      this.draw_tick_at(0.6875, 2);
+      this.draw_tick_at(0.71875, 1);
+      this.draw_tick_at(0.75, 4);
+      this.draw_tick_at(0.78125, 1);
+      this.draw_tick_at(0.8125, 2);
+      this.draw_tick_at(0.84375, 1);
+      this.draw_tick_at(0.875, 3);
+      this.draw_tick_at(0.90625, 1);
+      this.draw_tick_at(0.9375, 2);
+      this.draw_tick_at(0.96875, 1);
+      return this.draw_tick_at(1.0, 5);
+    };
+
+    return Curve;
+
+  })();
+
+  Bezier = (function(superClass) {
+    extend(Bezier, superClass);
+
+    function Bezier() {
+      this.update_at = bind(this.update_at, this);
+      return Bezier.__super__.constructor.apply(this, arguments);
+    }
+
+    Bezier.min_points = 2;
+
+    Bezier.max_points = 8;
+
+    Bezier.initial_points = [[0.06, 0.82], [0.72, 0.18]];
+
+    Bezier.prototype.order_up_rebalance = function() {
+      var cur, cur_id, k, prev, prev_id, results, x, y;
+      cur_id = this.enabled_points;
+      prev_id = cur_id - 1;
+      results = [];
+      while (prev_id >= 0) {
+        cur = this.points[0][cur_id];
+        prev = this.points[0][prev_id];
+        k = this.enabled_points;
+        x = ((k - cur_id) / k) * cur.position.x + (cur_id / k) * prev.position.x;
+        y = ((k - cur_id) / k) * cur.position.y + (cur_id / k) * prev.position.y;
+        cur.move(x, y);
+        cur_id--;
+        results.push(prev_id--);
+      }
+      return results;
+    };
+
+    Bezier.prototype.compute_lower_order_curve = function() {
+      var i, l, p, points, ref, results;
+      points = this.points[0].map(function(point) {
+        return {
+          x: point.position.x,
+          y: point.position.y
+        };
+      });
+      /* copied from: https://pomax.github.io/bezierinfo/chapters/reordering/reorder.js */
+
+    // Based on https://www.sirver.net/blog/2011/08/23/degree-reduction-of-bezier-curves/
+
+    // TODO: FIXME: this is the same code as in the old codebase,
+    //              and it does something odd to the either the
+    //              first or last point... it starts to travel
+    //              A LOT more than it looks like it should... O_o
+
+    p = points,
+    k = p.length,
+    data = [],
+    n = k-1;
+
+    //if (k <= 3) return;
+
+    // build M, which will be (k) rows by (k-1) columns
+    for(let i=0; i<k; i++) {
+      data[i] = (new Array(k - 1)).fill(0);
+      if(i===0) { data[i][0] = 1; }
+      else if(i===n) { data[i][i-1] = 1; }
+      else {
+        data[i][i-1] = i / k;
+        data[i][i] = 1 - data[i][i-1];
+      }
+    }
+
+    // Apply our matrix operations:
+    const M = new Matrix(data);
+    const Mt = M.transpose(M);
+    const Mc = Mt.multiply(M);
+    const Mi = Mc.invert();
+
+    if (!Mi) {
+      return console.error('MtM has no inverse?');
+    }
+
+    // And then we map our k-order list of coordinates
+    // to an n-order list of coordinates, instead:
+    const V = Mi.multiply(Mt);
+    const x = new Matrix(points.map(p => [p.x]));
+    const nx = V.multiply(x);
+    const y = new Matrix(points.map(p => [p.y]));
+    const ny = V.multiply(y);
+
+    points = nx.data.map((x,i) => ({
+      x: x[0],
+      y: ny.data[i][0]
+    }));;
+      results = [];
+      for (i = l = 0, ref = points.length; 0 <= ref ? l < ref : l > ref; i = 0 <= ref ? ++l : --l) {
+        p = APP.clamp_to_canvas(points[i]);
+        results.push(this.points[0][i].move(p.x, p.y));
+      }
+      return results;
+    };
+
+    Bezier.prototype.get_algorithm_text = function() {
+      var l, label, len, lines, m, order, p, ref, ref1;
+      lines = [];
+      for (order = l = 0, ref = this.enabled_points - 1; 0 <= ref ? l <= ref : l >= ref; order = 0 <= ref ? ++l : --l) {
+        if (order > 0) {
+          lines.push("");
+          lines.push("### Order " + order + " Bezier");
+        } else {
+          lines.push("### Points");
+        }
+        ref1 = this.points[order];
+        for (m = 0, len = ref1.length; m < len; m++) {
+          p = ref1[m];
+          if (!p.enabled) {
+            continue;
+          }
+          label = p === this.pen ? this.pen_label : p.get_label();
+          if (APP.option.alt_algorithm_names.value) {
+            switch (order) {
+              case 0:
+                lines.push(label + " = <" + (parseInt(p.position.x, 10)) + ", " + (parseInt(p.position.y, 10)) + ">");
+                break;
+              case 6:
+                if (label.length < 4) {
+                  lines.push(label + " = Lerp(" + (p.from.get_label()) + ", " + (p.to.get_label()) + ", t)");
+                } else {
+                  lines.push(label + " =");
+                  lines.push("    Lerp(" + (p.from.get_label()) + ",");
+                  lines.push("         " + (p.to.get_label()) + ", t)");
+                }
+                break;
+              case 7:
+                if (label.length < 4) {
+                  lines.push(label + " = Lerp(" + (p.from.get_label()) + ",");
+                } else {
+                  lines.push(label + " =");
+                  lines.push("    Lerp(" + (p.from.get_label()) + ",");
+                }
+                lines.push("         " + (p.to.get_label()) + ",");
+                lines.push("         t)");
+                break;
+              default:
+                lines.push(label + " = Lerp(" + (p.from.get_label()) + ", " + (p.to.get_label()) + ", t)");
+            }
+          } else {
+            if (order > 0) {
+              lines.push(label + " = Lerp(" + (p.from.get_label()) + ", " + (p.to.get_label()) + ", t)");
+            } else {
+              lines.push(label + " = <" + (parseInt(p.position.x, 10)) + ", " + (parseInt(p.position.y, 10)) + ">");
+            }
+          }
+        }
+      }
+      return lines.join("\n");
+    };
+
+    Bezier.prototype.update_at = function(t) {
+      var l, len, order, p, ref, results;
+      ref = this.points;
+      results = [];
+      for (l = 0, len = ref.length; l < len; l++) {
+        order = ref[l];
+        results.push((function() {
+          var len1, m, results1;
+          results1 = [];
+          for (m = 0, len1 = order.length; m < len1; m++) {
+            p = order[m];
+            results1.push(p.update(t));
+          }
+          return results1;
+        })());
+      }
+      return results;
+    };
+
+    return Bezier;
+
+  })(Curve);
+
+  Spline = (function(superClass) {
+    extend(Spline, superClass);
+
+    function Spline() {
+      this.update_at = bind(this.update_at, this);
+      return Spline.__super__.constructor.apply(this, arguments);
+    }
+
+    Spline.min_points = 2;
+
+    Spline.max_points = 8;
+
+    Spline.initial_points = [[0.06, 0.82], [0.15, 0.08], [0.72, 0.18], [0.88, 0.90]];
+
+    Spline.prototype.update_at = function(t) {
+      var l, len, order, p, ref, results;
+      ref = this.points;
+      results = [];
+      for (l = 0, len = ref.length; l < len; l++) {
+        order = ref[l];
+        results.push((function() {
+          var len1, m, results1;
+          results1 = [];
+          for (m = 0, len1 = order.length; m < len1; m++) {
+            p = order[m];
+            results1.push(p.update(t));
+          }
+          return results1;
+        })());
+      }
+      return results;
+    };
+
+    Spline.prototype.get_algorithm_text = function() {
+      return '';
+    };
+
+    return Spline;
+
+  })(Curve);
+
+  LERPingSplines = (function() {
     LERPingSplines.create_point_margin = 0.12;
 
     LERPingSplines.point_radius = 5;
@@ -1210,9 +1747,8 @@ class Matrix {
       this.update_callback = bind(this.update_callback, this);
       this.update = bind(this.update, this);
       this.update_at = bind(this.update_at, this);
-      this.update_spline_mode_at = bind(this.update_spline_mode_at, this);
-      this.update_bezier_mode_at = bind(this.update_bezier_mode_at, this);
       this.redraw_ui = bind(this.redraw_ui, this);
+      this.draw = bind(this.draw, this);
       this.on_mouseup = bind(this.on_mouseup, this);
       this.on_mouseup_canvas = bind(this.on_mouseup_canvas, this);
       this.on_mouseup_tslider = bind(this.on_mouseup_tslider, this);
@@ -1294,8 +1830,8 @@ class Matrix {
         max_x: this.graph_width - LERPingSplines.point_label_flip_margin,
         max_y: this.graph_height - LERPingSplines.point_label_flip_margin
       };
-      this.points = [];
-      this.enabled_points = 0;
+      this.bezier_curve = new Bezier();
+      this.spline_curve = new Spline();
       this.tvar = this.context.getElementById('tvar');
       this.tslider_btn_min = this.find_element('tbox_slider_btn_min');
       this.tslider_btn_min.addEventListener('click', this.on_tslide_btn_min_click);
@@ -1324,26 +1860,17 @@ class Matrix {
       if ((ref1 = this.remove_point_btn) != null) {
         ref1.addEventListener('click', this.on_remove_point_btn_click);
       }
+      this.algorithmbox = this.find_element('algorithmbox');
+      this.algorithm_text = this.find_element('algorithm_text');
+      this.bezier_curve.add_initial_points();
+      this.spline_curve.add_initial_points();
+      this.option.mode.change();
       this.context.addEventListener('mousemove', this.on_mousemove);
       this.context.addEventListener('mousedown', this.on_mousedown);
       this.context.addEventListener('mouseup', this.on_mouseup);
-      this.pen_label = 'P';
-      this.pen_label_metrics = APP.graph_ctx.measureText(this.pen_label);
-      this.pen_label_width = this.pen_label_metrics.width;
-      this.pen_label_height = LERPingSplines.pen_label_height;
-      this.pen_label_offset = {
-        x: this.pen_label_width / 2,
-        y: this.pen_label_height / 2
-      };
-      this.pen_label_offset_length = Vec2.magnitude(this.pen_label_offset);
-      this.algorithmbox = this.find_element('algorithmbox');
-      this.algorithm_text = this.find_element('algorithm_text');
       console.log('init() completed!');
-      this.option.mode.change();
-      this.add_initial_points();
       this.update();
-      this.stop();
-      return this.debug("Ready!");
+      return this.stop();
     };
 
     LERPingSplines.prototype.debug = function(msg_text) {
@@ -1446,195 +1973,11 @@ class Matrix {
       return this.loop_running = false;
     };
 
-    LERPingSplines.prototype.add_initial_points = function() {
-      var i, j, l, lerp, m, margin, n, order, prev, prev_order, range, ref, ref1, ref2, x, y;
-      margin = LERPingSplines.create_point_margin;
-      range = 1.0 - (2.0 * margin);
-      this.points[0] = [];
-      for (i = l = 0, ref = LERPingSplines.max_points; 0 <= ref ? l <= ref : l >= ref; i = 0 <= ref ? ++l : --l) {
-        x = margin + (range * Math.random());
-        y = margin + (range * Math.random());
-        this.points[0][i] = new Point(x * this.graph_width, y * this.graph_height);
-        this.points[0][i].set_label(LERPingSplines.point_labels[i]);
-      }
-      for (order = m = 1, ref1 = LERPingSplines.max_points; 1 <= ref1 ? m <= ref1 : m >= ref1; order = 1 <= ref1 ? ++m : --m) {
-        this.points[order] = [];
-        prev_order = order - 1;
-        prev = this.points[prev_order];
-        for (j = n = 0, ref2 = LERPingSplines.max_points - order; 0 <= ref2 ? n <= ref2 : n >= ref2; j = 0 <= ref2 ? ++n : --n) {
-          lerp = new LERP(order, prev[j], prev[j + 1]);
-          this.points[order][j] = lerp;
-          this.points[order][j].generate_label(order, j);
-        }
-      }
-      this.enable_point_at(0.06, 0.82);
-      this.enable_point_at(0.72, 0.18);
-      this.update_enabled_points();
-      return console.log('Initial points created!');
-    };
-
-    LERPingSplines.prototype.find_point = function(x, y) {
-      var l, len, p, ref;
-      if (!((this.points != null) && (this.points[0] != null))) {
-        return null;
-      }
-      ref = this.points[0];
-      for (l = 0, len = ref.length; l < len; l++) {
-        p = ref[l];
-        if (p != null ? p.contains(x, y) : void 0) {
-          return p;
-        }
-      }
-      return null;
-    };
-
-    LERPingSplines.prototype.update_enabled_points = function() {
-      var i, l, p, ref;
-      if (this.enabled_points < LERPingSplines.max_points) {
-        this.add_point_btn.disabled = false;
-      } else {
-        this.add_point_btn.disabled = true;
-      }
-      if (this.enabled_points > LERPingSplines.min_points) {
-        this.remove_point_btn.disabled = false;
-      } else {
-        this.remove_point_btn.disabled = true;
-      }
-      this.num_points.textContent = "" + this.enabled_points;
-      this.update();
-      p = null;
-      for (i = l = ref = LERPingSplines.max_points - 1; ref <= 1 ? l <= 1 : l >= 1; i = ref <= 1 ? ++l : --l) {
-        p = this.points[i][0];
-        if (p != null ? p.enabled : void 0) {
-          break;
-        }
-      }
-      if (p != null) {
-        this.pen = p;
-        this.pen.update_order_0_point_label_color();
-      } else {
-        this.debug("ERROR: no pen?!");
-      }
-      return this.update_algorithm();
-    };
-
-    LERPingSplines.prototype.enable_point = function(rebalance_points) {
-      var cur, cur_id, k, p, prev, prev_id, x, y;
-      if (this.enabled_points >= LERPingSplines.max_points) {
-        return;
-      }
-      p = this.points[0][this.enabled_points];
-      if (rebalance_points && this.option.rebalance_points_on_order_up.value) {
-        cur_id = this.enabled_points;
-        prev_id = cur_id - 1;
-        while (prev_id >= 0) {
-          cur = this.points[0][cur_id];
-          prev = this.points[0][prev_id];
-          k = this.enabled_points;
-          x = ((k - cur_id) / k) * cur.position.x + (cur_id / k) * prev.position.x;
-          y = ((k - cur_id) / k) * cur.position.y + (cur_id / k) * prev.position.y;
-          cur.move(x, y);
-          cur_id--;
-          prev_id--;
-        }
-      }
-      p.enabled = true;
-      this.enabled_points += 1;
-      this.update_enabled_points();
-      return p;
-    };
-
-    LERPingSplines.prototype.enable_point_at = function(x, y) {
-      var p;
-      p = this.enable_point(false);
-      p.x = x * this.graph_width;
-      p.y = y * this.graph_height;
-      return p;
-    };
-
-    LERPingSplines.prototype.compute_lower_order_curve = function() {
-      var i, l, p, points, ref, results;
-      points = this.points[0].map(function(point) {
-        return {
-          x: point.position.x,
-          y: point.position.y
-        };
-      });
-      /* copied from: https://pomax.github.io/bezierinfo/chapters/reordering/reorder.js */
-
-    // Based on https://www.sirver.net/blog/2011/08/23/degree-reduction-of-bezier-curves/
-
-    // TODO: FIXME: this is the same code as in the old codebase,
-    //              and it does something odd to the either the
-    //              first or last point... it starts to travel
-    //              A LOT more than it looks like it should... O_o
-
-    p = points,
-    k = p.length,
-    data = [],
-    n = k-1;
-
-    //if (k <= 3) return;
-
-    // build M, which will be (k) rows by (k-1) columns
-    for(let i=0; i<k; i++) {
-      data[i] = (new Array(k - 1)).fill(0);
-      if(i===0) { data[i][0] = 1; }
-      else if(i===n) { data[i][i-1] = 1; }
-      else {
-        data[i][i-1] = i / k;
-        data[i][i] = 1 - data[i][i-1];
-      }
-    }
-
-    // Apply our matrix operations:
-    const M = new Matrix(data);
-    const Mt = M.transpose(M);
-    const Mc = Mt.multiply(M);
-    const Mi = Mc.invert();
-
-    if (!Mi) {
-      return console.error('MtM has no inverse?');
-    }
-
-    // And then we map our k-order list of coordinates
-    // to an n-order list of coordinates, instead:
-    const V = Mi.multiply(Mt);
-    const x = new Matrix(points.map(p => [p.x]));
-    const nx = V.multiply(x);
-    const y = new Matrix(points.map(p => [p.y]));
-    const ny = V.multiply(y);
-
-    points = nx.data.map((x,i) => ({
-      x: x[0],
-      y: ny.data[i][0]
-    }));;
-      results = [];
-      for (i = l = 0, ref = points.length; 0 <= ref ? l < ref : l > ref; i = 0 <= ref ? ++l : --l) {
-        p = this.clamp_to_canvas(points[i]);
-        results.push(this.points[0][i].move(p.x, p.y));
-      }
-      return results;
-    };
-
-    LERPingSplines.prototype.disable_point = function() {
-      var p;
-      if (this.enabled_points <= LERPingSplines.min_points) {
-        return;
-      }
-      if (this.enabled_points > 3 && this.option.rebalance_points_on_order_down.value) {
-        this.compute_lower_order_curve();
-      }
-      this.enabled_points -= 1;
-      p = this.points[0][this.enabled_points];
-      p.enabled = false;
-      return this.update_enabled_points();
-    };
-
     LERPingSplines.prototype.configure_for_bezier_mode = function() {
       console.log("configure for mode: bezier");
       this.bezier_mode = true;
       this.spline_mode = false;
+      this.curve = this.bezier_curve;
       return this.update_and_draw();
     };
 
@@ -1642,6 +1985,7 @@ class Matrix {
       console.log("configure for mode: spline");
       this.bezier_mode = false;
       this.spline_mode = true;
+      this.curve = this.spline_curve;
       return this.update_and_draw();
     };
 
@@ -1687,12 +2031,12 @@ class Matrix {
     };
 
     LERPingSplines.prototype.on_add_point_btn_click = function(event, ui) {
-      this.enable_point(true);
+      this.curve.enable_point(true);
       return this.update_and_draw();
     };
 
     LERPingSplines.prototype.on_remove_point_btn_click = function(event, ui) {
-      this.disable_point();
+      this.curve.disable_point();
       return this.update_and_draw();
     };
 
@@ -1771,62 +2115,12 @@ class Matrix {
     };
 
     LERPingSplines.prototype.update_algorithm = function() {
-      var l, label, len, lines, m, order, p, ref, ref1;
-      if (!this.option.show_algorithm.value) {
+      if (this.curve == null) {
         return;
       }
-      lines = [];
-      for (order = l = 0, ref = this.enabled_points - 1; 0 <= ref ? l <= ref : l >= ref; order = 0 <= ref ? ++l : --l) {
-        if (order > 0) {
-          lines.push("");
-          lines.push("### Order " + order + " Bezier");
-        } else {
-          lines.push("### Points");
-        }
-        ref1 = this.points[order];
-        for (m = 0, len = ref1.length; m < len; m++) {
-          p = ref1[m];
-          if (!p.enabled) {
-            continue;
-          }
-          label = p === this.pen ? this.pen_label : p.get_label();
-          if (this.option.alt_algorithm_names.value) {
-            switch (order) {
-              case 0:
-                lines.push(label + " = <" + (parseInt(p.position.x, 10)) + ", " + (parseInt(p.position.y, 10)) + ">");
-                break;
-              case 6:
-                if (label.length < 4) {
-                  lines.push(label + " = Lerp(" + (p.from.get_label()) + ", " + (p.to.get_label()) + ", t)");
-                } else {
-                  lines.push(label + " =");
-                  lines.push("    Lerp(" + (p.from.get_label()) + ",");
-                  lines.push("         " + (p.to.get_label()) + ", t)");
-                }
-                break;
-              case 7:
-                if (label.length < 4) {
-                  lines.push(label + " = Lerp(" + (p.from.get_label()) + ",");
-                } else {
-                  lines.push(label + " =");
-                  lines.push("    Lerp(" + (p.from.get_label()) + ",");
-                }
-                lines.push("         " + (p.to.get_label()) + ",");
-                lines.push("         t)");
-                break;
-              default:
-                lines.push(label + " = Lerp(" + (p.from.get_label()) + ", " + (p.to.get_label()) + ", t)");
-            }
-          } else {
-            if (order > 0) {
-              lines.push(label + " = Lerp(" + (p.from.get_label()) + ", " + (p.to.get_label()) + ", t)");
-            } else {
-              lines.push(label + " = <" + (parseInt(p.position.x, 10)) + ", " + (parseInt(p.position.y, 10)) + ">");
-            }
-          }
-        }
+      if (this.option.show_algorithm.value) {
+        return this.algorithm_text.innerText = this.curve.get_algorithm_text();
       }
-      return this.algorithm_text.innerText = lines.join("\n");
     };
 
     LERPingSplines.prototype.on_show_algorithm_true = function() {
@@ -1877,7 +2171,7 @@ class Matrix {
     LERPingSplines.prototype.on_mousemove_canvas = function(event) {
       var l, len, mouse, oldhover, oldx, oldy, order, p, ref, results;
       mouse = this.get_mouse_coord(event);
-      ref = this.points;
+      ref = this.curve.points;
       results = [];
       for (l = 0, len = ref.length; l < len; l++) {
         order = ref[l];
@@ -1937,7 +2231,7 @@ class Matrix {
       var mouse, p;
       this.point_has_changed = false;
       mouse = this.get_mouse_coord(event);
-      p = this.find_point(mouse.x, mouse.y);
+      p = this.curve.find_point(mouse.x, mouse.y);
       if (p != null) {
         return p.selected = true;
       }
@@ -1950,7 +2244,7 @@ class Matrix {
 
     LERPingSplines.prototype.on_mouseup_canvas = function(event) {
       var l, len, len1, m, order, p, ref;
-      ref = this.points;
+      ref = this.curve.points;
       for (l = 0, len = ref.length; l < len; l++) {
         order = ref[l];
         for (m = 0, len1 = order.length; m < len1; m++) {
@@ -1971,18 +2265,19 @@ class Matrix {
       }
     };
 
+    LERPingSplines.prototype.draw = function() {
+      return this.curve.draw();
+    };
+
     LERPingSplines.prototype.redraw_ui = function(render_bitmap_preview) {
-      var l, len, len1, m, order, p, ref, ref1;
+      var l, len, len1, m, order, p, ref;
       if (render_bitmap_preview == null) {
         render_bitmap_preview = true;
       }
       this.graph_ui_ctx.clearRect(0, 0, this.graph_ui_canvas.width, this.graph_ui_canvas.height);
-      if ((ref = this.cur) != null) {
-        ref.draw_ui();
-      }
-      ref1 = this.points;
-      for (l = 0, len = ref1.length; l < len; l++) {
-        order = ref1[l];
+      ref = this.canvas.points;
+      for (l = 0, len = ref.length; l < len; l++) {
+        order = ref[l];
         for (m = 0, len1 = order.length; m < len1; m++) {
           p = order[m];
           p.draw_ui();
@@ -1991,229 +2286,24 @@ class Matrix {
       return null;
     };
 
-    LERPingSplines.prototype.update_bezier_mode_at = function(t) {
-      var l, len, order, p, ref, results;
-      ref = this.points;
-      results = [];
-      for (l = 0, len = ref.length; l < len; l++) {
-        order = ref[l];
-        results.push((function() {
-          var len1, m, results1;
-          results1 = [];
-          for (m = 0, len1 = order.length; m < len1; m++) {
-            p = order[m];
-            results1.push(p.update(t));
-          }
-          return results1;
-        })());
-      }
-      return results;
-    };
-
-    LERPingSplines.prototype.update_spline_mode_at = function(t) {};
-
     LERPingSplines.prototype.update_at = function(t) {
-      if (this.bezier_mode) {
-        return this.update_bezier_mode_at(t);
-      } else if (this.spline_mode) {
-        return this.update_spline_mode_at(t);
-      } else {
-        return this.fatal_error("no mode set during update() running=" + this.running);
-      }
+      return this.curve.update_at(t);
     };
 
     LERPingSplines.prototype.update = function() {
       return this.update_at(this.t);
     };
 
-    LERPingSplines.prototype.draw_bezier = function() {
-      var ctx, i, l, p, ref, start, t;
-      if (!((this.points != null) && (this.points[0] != null))) {
-        return;
-      }
-      start = this.points[0][0];
-      p = null;
-      for (i = l = ref = LERPingSplines.max_points - 1; ref <= 1 ? l <= 1 : l >= 1; i = ref <= 1 ? ++l : --l) {
-        p = this.points[i][0];
-        if (p != null ? p.enabled : void 0) {
-          break;
-        }
-      }
-      if (this.pen == null) {
-        this.debug("missing pen");
-      }
-      if (p !== this.pen) {
-        console.log('p', p);
-        console.log('@pen', this.pen);
-      }
-      p = this.pen;
-      ctx = this.graph_ctx;
-      ctx.beginPath();
-      ctx.strokeStyle = p.color;
-      ctx.lineWidth = 3;
-      t = 0.0;
-      this.update_at(t);
-      ctx.moveTo(p.position.x, p.position.y);
-      while (t < 1.0) {
-        t += 0.02;
-        this.update_at(t);
-        ctx.lineTo(p.position.x, p.position.y);
-      }
-      return ctx.stroke();
-    };
-
-    LERPingSplines.prototype.draw = function() {
-      var l, len, len1, len2, len3, m, n, o, order, p, ref, ref1, ref2, results;
-      if (!((this.points != null) && (this.points[0] != null))) {
-        return;
-      }
-      ref = this.points;
-      for (l = 0, len = ref.length; l < len; l++) {
-        order = ref[l];
-        for (m = 0, len1 = order.length; m < len1; m++) {
-          p = order[m];
-          if (p.order > 1) {
-            p.draw();
-          }
-        }
-      }
-      ref1 = this.points[1];
-      for (n = 0, len2 = ref1.length; n < len2; n++) {
-        p = ref1[n];
-        p.draw();
-      }
-      ref2 = this.points[0];
-      results = [];
-      for (o = 0, len3 = ref2.length; o < len3; o++) {
-        p = ref2[o];
-        results.push(p.draw());
-      }
-      return results;
-    };
-
-    LERPingSplines.prototype.get_normal = function() {
-      var normal;
-      this.update_at(this.t - this.t_step);
-      this.pen.prev_position.x = this.pen.position.x;
-      this.pen.prev_position.y = this.pen.position.y;
-      this.update();
-      if ((this.pen.prev_position.x != null) && (this.pen.prev_position.y != null)) {
-        normal = {
-          x: -(this.pen.position.y - this.pen.prev_position.y),
-          y: this.pen.position.x - this.pen.prev_position.x
-        };
-        return Vec2.normalize(normal);
-      } else {
-        return null;
-      }
-    };
-
-    LERPingSplines.prototype.draw_pen = function() {
-      var angle, arrow, arrow_shaft, arrow_side1, arrow_side2, arrowtip, ctx, normal, plabel_offset, plx, ply;
-      if (this.pen == null) {
-        return;
-      }
-      normal = this.get_normal();
-      if (normal != null) {
-        arrow = Vec2.scale(normal, 22.0);
-        arrowtip = Vec2.scale(normal, 15.0);
-        arrow_shaft = Vec2.scale(normal, 65.0);
-        angle = TAU / 8.0;
-        arrow_side1 = Vec2.rotate(arrow, angle);
-        arrow_side2 = Vec2.rotate(arrow, -angle);
-        arrowtip.x += this.pen.position.x;
-        arrowtip.y += this.pen.position.y;
-        ctx = this.graph_ctx;
-        ctx.beginPath();
-        ctx.moveTo(arrowtip.x, arrowtip.y);
-        ctx.lineTo(arrowtip.x + arrow_shaft.x, arrowtip.y + arrow_shaft.y);
-        ctx.moveTo(arrowtip.x, arrowtip.y);
-        ctx.lineTo(arrowtip.x + arrow_side1.x, arrowtip.y + arrow_side1.y);
-        ctx.moveTo(arrowtip.x, arrowtip.y);
-        ctx.lineTo(arrowtip.x + arrow_side2.x, arrowtip.y + arrow_side2.y);
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 2;
-        ctx.lineCap = "round";
-        ctx.stroke();
-        plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), this.pen_label_offset_length + 3);
-        plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - this.pen_label_offset.x;
-        ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - this.pen_label_offset.y + this.pen_label_height;
-        ctx.fillStyle = '#000';
-        return ctx.fillText(this.pen_label, plx, ply);
-      }
-    };
-
-    LERPingSplines.prototype.draw_tick_at = function(t, size) {
-      var ctx, normal, point_a_x, point_a_y, point_b_x, point_b_y, t_save;
-      if (this.pen == null) {
-        return;
-      }
-      t_save = this.t;
-      this.t = t;
-      normal = this.get_normal();
-      if (normal != null) {
-        normal = Vec2.scale(normal, 3 + (4.0 * size));
-        point_a_x = this.pen.position.x + normal.x;
-        point_a_y = this.pen.position.y + normal.y;
-        point_b_x = this.pen.position.x - normal.x;
-        point_b_y = this.pen.position.y - normal.y;
-        ctx = this.graph_ctx;
-        ctx.beginPath();
-        ctx.moveTo(point_a_x, point_a_y);
-        ctx.lineTo(point_b_x, point_b_y);
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = size > 3 ? 2 : 1;
-        ctx.stroke();
-      }
-      return this.t = t_save;
-    };
-
-    LERPingSplines.prototype.draw_ticks = function() {
-      this.draw_tick_at(0.0, 5);
-      this.draw_tick_at(0.03125, 1);
-      this.draw_tick_at(0.0625, 2);
-      this.draw_tick_at(0.09375, 1);
-      this.draw_tick_at(0.125, 3);
-      this.draw_tick_at(0.15625, 1);
-      this.draw_tick_at(0.1875, 2);
-      this.draw_tick_at(0.21875, 1);
-      this.draw_tick_at(0.25, 4);
-      this.draw_tick_at(0.28125, 1);
-      this.draw_tick_at(0.3125, 2);
-      this.draw_tick_at(0.34375, 1);
-      this.draw_tick_at(0.375, 3);
-      this.draw_tick_at(0.40625, 1);
-      this.draw_tick_at(0.4375, 2);
-      this.draw_tick_at(0.46875, 1);
-      this.draw_tick_at(0.5, 5);
-      this.draw_tick_at(0.53125, 1);
-      this.draw_tick_at(0.5625, 2);
-      this.draw_tick_at(0.59375, 1);
-      this.draw_tick_at(0.625, 3);
-      this.draw_tick_at(0.65625, 1);
-      this.draw_tick_at(0.6875, 2);
-      this.draw_tick_at(0.71875, 1);
-      this.draw_tick_at(0.75, 4);
-      this.draw_tick_at(0.78125, 1);
-      this.draw_tick_at(0.8125, 2);
-      this.draw_tick_at(0.84375, 1);
-      this.draw_tick_at(0.875, 3);
-      this.draw_tick_at(0.90625, 1);
-      this.draw_tick_at(0.9375, 2);
-      this.draw_tick_at(0.96875, 1);
-      return this.draw_tick_at(1.0, 5);
-    };
-
     LERPingSplines.prototype.update_and_draw = function() {
       this.graph_ctx.clearRect(0, 0, this.graph_canvas.width, this.graph_canvas.height);
       if (this.option.show_ticks.value) {
-        this.draw_ticks();
+        this.curve.draw_ticks();
       }
-      this.draw_bezier();
+      this.curve.draw_bezier();
       this.update();
-      this.draw();
+      this.curve.draw();
       if (this.option.show_pen_label.value) {
-        return this.draw_pen();
+        return this.curve.draw_pen();
       }
     };
 

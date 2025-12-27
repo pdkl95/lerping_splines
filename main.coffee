@@ -186,6 +186,8 @@ class LERP extends Point
       ctx.stroke()
 
   update_order_0_point_label_color: ->
+    return unless APP.points?
+
     rgb = Color.hex2rgb(@color);
     hsv = Color.rgb2hsv(rgb[0], rgb[1], rgb[2]);
     hsv[0] += 0.7
@@ -198,13 +200,443 @@ class LERP extends Point
     for p in APP.points[0]
       p.label_color = color
 
-class LERPingSplines
+class Curve
+  constructor: ->
+    @points = []
+    @enabled_points = 0
+
+    @pen_label = 'P'
+    @pen_label_metrics = APP.graph_ctx.measureText(@pen_label)
+    @pen_label_width   = @pen_label_metrics.width
+    @pen_label_height  = LERPingSplines.pen_label_height
+    @pen_label_offset =
+      x: @pen_label_width  / 2
+      y: @pen_label_height / 2
+
+    @pen_label_offset_length = Vec2.magnitude(@pen_label_offset)
+
+  min_points: ->
+    @constructor.min_points
+
+  max_points: ->
+    @constructor.max_points
+
+  add_initial_points: ->
+    margin = LERPingSplines.create_point_margin
+    range = 1.0 - (2.0 * margin)
+
+    @points[0] = []
+    for i in [0..@max_points()]
+      x = margin + (range * Math.random())
+      y = margin + (range * Math.random())
+      @points[0][i] = new Point(x * APP.graph_width, y * APP.graph_height)
+      @points[0][i].set_label( LERPingSplines.point_labels[i] )
+
+    for order in [1..@max_points()]
+      @points[order] = []
+      prev_order = order - 1
+      prev = @points[prev_order]
+      for j in [0..(@max_points() - order)]
+        lerp = new LERP( order, prev[j], prev[j+1] )
+        @points[order][j] = lerp
+        @points[order][j].generate_label(order, j)
+
+    for point in @constructor.initial_points
+      @enable_point_at( point[0], point[1] )
+
+    @update_enabled_points()
+
+    console.log('Initial points created!')
+
+  find_point: (x, y) ->
+    return null unless @points? and @points[0]?
+    for p in @points[0]
+      if p?.contains(x, y)
+        return p    
+    return null
+
+  update_enabled_points: ->
+    if @enabled_points < @max_points()
+      APP.add_point_btn.disabled = false
+    else
+      APP.add_point_btn.disabled = true
+
+    if @enabled_points > @min_points()
+      APP.remove_point_btn.disabled = false
+    else
+      APP.remove_point_btn.disabled = true
+
+    APP.num_points.textContent = "#{@enabled_points}"
+
+    @update()
+
+    p = null
+    for i in [(@max_points() - 1)..1]
+      p = @points[i][0]
+      if p?.enabled
+        break
+    if p?
+      @pen = p
+      @pen.update_order_0_point_label_color()
+    else
+      @debug("ERROR: no pen?!")
+
+    APP.update_algorithm()
+
+  order_up_rebalance: ->
+
+  enable_point: (rebalance_points) ->
+    return if @enabled_points >= @max_points()
+    p = @points[0][@enabled_points]
+
+    if rebalance_points and APP.option.rebalance_points_on_order_up.value
+      @order_up_rebalance()
+
+    p.enabled = true
+    @enabled_points += 1
+    @update_enabled_points()
+    p
+
+  enable_point_at: (x, y) ->
+    p = @enable_point(false)
+    p.x = x * APP.graph_width
+    p.y = y * APP.graph_height
+    p
+
+  compute_lower_order_curve: ->
+
+  disable_point: ->
+    return if @enabled_points <= @min_points()
+
+    if @enabled_points > 3 and APP.option.rebalance_points_on_order_down.value
+      @compute_lower_order_curve()
+
+    @enabled_points -= 1
+    p = @points[0][@enabled_points]
+    p.enabled = false
+    @update_enabled_points()
+
+  update: ->
+    @update_at(APP.t)
+
+  draw_bezier: ->
+    return unless @points? and @points[0]?
+
+    start = @points[0][0]
+
+    p = null
+    for i in [(@max_points() - 1)..1]
+      p = @points[i][0]
+      if p?.enabled
+        break
+
+    @debug("missing pen") unless @pen?
+    if p isnt @pen
+      console.log('p',p)
+      console.log('@pen',@pen)
+    p = @pen
+
+    ctx = APP.graph_ctx
+    ctx.beginPath()
+    ctx.strokeStyle = p.color
+    ctx.lineWidth = 3
+
+    t = 0.0
+    @update_at(t)
+    ctx.moveTo(p.position.x, p.position.y)
+    while t < 1.0
+      t += 0.02
+      @update_at(t)
+      ctx.lineTo(p.position.x, p.position.y)
+
+    ctx.stroke()
+
+  draw: ->
+    return unless @points? and @points[0]?
+
+    for order in @points
+      for p in order
+        if p.order > 1
+          p.draw()
+    for p in @points[1]
+      p.draw()
+    for p in @points[0]
+      p.draw()
+
+  get_normal: ->
+    @update_at(@t - @t_step)
+    @pen.prev_position.x = @pen.position.x
+    @pen.prev_position.y = @pen.position.y
+    @update()
+
+    if @pen.prev_position.x? and @pen.prev_position.y?
+      normal =
+        x: -(@pen.position.y - @pen.prev_position.y)
+        y:  (@pen.position.x - @pen.prev_position.x)
+
+      Vec2.normalize(normal)
+    else
+      null
+
+  draw_pen: ->
+    return unless @pen?
+    normal = @get_normal()
+    if normal?
+      arrow       = Vec2.scale(normal, 22.0)
+      arrowtip    = Vec2.scale(normal, 15.0)
+      arrow_shaft = Vec2.scale(normal, 65.0)
+
+      angle = TAU / 8.0
+      arrow_side1 = Vec2.rotate(arrow, angle)
+      arrow_side2 = Vec2.rotate(arrow, -angle)
+
+      arrowtip.x += @pen.position.x
+      arrowtip.y += @pen.position.y
+
+      ctx = APP.graph_ctx
+      ctx.beginPath()
+      ctx.moveTo(arrowtip.x, arrowtip.y)
+      ctx.lineTo(arrowtip.x + arrow_shaft.x, arrowtip.y + arrow_shaft.y)
+      ctx.moveTo(arrowtip.x, arrowtip.y)
+      ctx.lineTo(arrowtip.x + arrow_side1.x, arrowtip.y + arrow_side1.y)
+      ctx.moveTo(arrowtip.x, arrowtip.y)
+      ctx.lineTo(arrowtip.x + arrow_side2.x, arrowtip.y + arrow_side2.y)
+      ctx.strokeStyle = '#000000'
+      ctx.lineWidth = 2
+      ctx.lineCap = "round"
+      ctx.stroke()
+
+      plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), @pen_label_offset_length + 3)
+      plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - @pen_label_offset.x
+      ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - @pen_label_offset.y + @pen_label_height
+      ctx.fillStyle = '#000'
+      ctx.fillText(@pen_label, plx, ply);
+
+  draw_tick_at: (t, size) ->
+    return unless @pen?
+    t_save = @t
+
+    @t = t
+    normal = @get_normal()
+    if normal?
+      normal = Vec2.scale(normal, 3 + (4.0 * size))
+
+      point_a_x = @pen.position.x + normal.x
+      point_a_y = @pen.position.y + normal.y
+
+      point_b_x = @pen.position.x - normal.x
+      point_b_y = @pen.position.y - normal.y
+
+      ctx = APP.graph_ctx
+      ctx.beginPath()
+      ctx.moveTo(point_a_x, point_a_y)
+      ctx.lineTo(point_b_x, point_b_y)
+      ctx.strokeStyle = '#000000'
+      ctx.lineWidth = if size > 3 then 2 else 1
+      ctx.stroke()
+
+    @t = t_save
+
+  draw_ticks: ->
+    @draw_tick_at(0.0,     5)
+    @draw_tick_at(0.03125, 1)
+    @draw_tick_at(0.0625,  2)
+    @draw_tick_at(0.09375, 1)
+    @draw_tick_at(0.125,   3)
+    @draw_tick_at(0.15625, 1)
+    @draw_tick_at(0.1875,  2)
+    @draw_tick_at(0.21875, 1)
+    @draw_tick_at(0.25,    4)
+    @draw_tick_at(0.28125, 1)
+    @draw_tick_at(0.3125,  2)
+    @draw_tick_at(0.34375, 1)
+    @draw_tick_at(0.375,   3)
+    @draw_tick_at(0.40625, 1)
+    @draw_tick_at(0.4375,  2)
+    @draw_tick_at(0.46875, 1)
+    @draw_tick_at(0.5,     5)
+    @draw_tick_at(0.53125, 1)
+    @draw_tick_at(0.5625,  2)
+    @draw_tick_at(0.59375, 1)
+    @draw_tick_at(0.625,   3)
+    @draw_tick_at(0.65625, 1)
+    @draw_tick_at(0.6875,  2)
+    @draw_tick_at(0.71875, 1)
+    @draw_tick_at(0.75,    4)
+    @draw_tick_at(0.78125, 1)
+    @draw_tick_at(0.8125,  2)
+    @draw_tick_at(0.84375, 1)
+    @draw_tick_at(0.875,   3)
+    @draw_tick_at(0.90625, 1)
+    @draw_tick_at(0.9375,  2)
+    @draw_tick_at(0.96875, 1)
+    @draw_tick_at(1.0,     5)
+
+
+class Bezier extends Curve
   @min_points: 2
   @max_points: 8
 
-  @max_lerp_order: ->
-    LERPingSplines.max_points - 1
+  @initial_points: [
+    [ 0.06, 0.82 ],
+    [ 0.72, 0.18 ]
+  ]
 
+  order_up_rebalance: ->
+    cur_id = @enabled_points
+    prev_id = cur_id - 1
+    while prev_id >= 0
+      cur  = @points[0][cur_id]
+      prev = @points[0][prev_id]
+
+      k = @enabled_points
+
+      x = ((k - cur_id) / k) * cur.position.x + (cur_id / k) * prev.position.x
+      y = ((k - cur_id) / k) * cur.position.y + (cur_id / k) * prev.position.y
+
+      cur.move(x, y)
+
+      cur_id--
+      prev_id--
+
+  compute_lower_order_curve: ->
+    points = @points[0].map (point) ->
+      return
+        x: point.position.x
+        y: point.position.y
+
+    `/* copied from: https://pomax.github.io/bezierinfo/chapters/reordering/reorder.js */
+
+    // Based on https://www.sirver.net/blog/2011/08/23/degree-reduction-of-bezier-curves/
+
+    // TODO: FIXME: this is the same code as in the old codebase,
+    //              and it does something odd to the either the
+    //              first or last point... it starts to travel
+    //              A LOT more than it looks like it should... O_o
+
+    p = points,
+    k = p.length,
+    data = [],
+    n = k-1;
+
+    //if (k <= 3) return;
+
+    // build M, which will be (k) rows by (k-1) columns
+    for(let i=0; i<k; i++) {
+      data[i] = (new Array(k - 1)).fill(0);
+      if(i===0) { data[i][0] = 1; }
+      else if(i===n) { data[i][i-1] = 1; }
+      else {
+        data[i][i-1] = i / k;
+        data[i][i] = 1 - data[i][i-1];
+      }
+    }
+
+    // Apply our matrix operations:
+    const M = new Matrix(data);
+    const Mt = M.transpose(M);
+    const Mc = Mt.multiply(M);
+    const Mi = Mc.invert();
+
+    if (!Mi) {
+      return console.error('MtM has no inverse?');
+    }
+
+    // And then we map our k-order list of coordinates
+    // to an n-order list of coordinates, instead:
+    const V = Mi.multiply(Mt);
+    const x = new Matrix(points.map(p => [p.x]));
+    const nx = V.multiply(x);
+    const y = new Matrix(points.map(p => [p.y]));
+    const ny = V.multiply(y);
+
+    points = nx.data.map((x,i) => ({
+      x: x[0],
+      y: ny.data[i][0]
+    }));`
+
+    for i in [0...points.length]
+      p = APP.clamp_to_canvas(points[i])
+      @points[0][i].move(p.x, p.y)
+
+  get_algorithm_text: ->
+    lines = []
+    for order in [0..(@enabled_points - 1)]
+      if order > 0
+        lines.push ""
+        lines.push "### Order #{order} Bezier"
+      else
+        lines.push "### Points"
+
+      for p in @points[order]
+        continue unless p.enabled
+
+        label = if p is @pen then @pen_label else p.get_label()
+
+        if APP.option.alt_algorithm_names.value
+          # alt
+          switch order
+            when 0
+              lines.push "#{label} = <#{parseInt(p.position.x, 10)}, #{parseInt(p.position.y, 10)}>"
+
+            when 6
+              if label.length < 4
+                lines.push "#{label} = Lerp(#{p.from.get_label()}, #{p.to.get_label()}, t)"
+
+              else
+                lines.push "#{label} ="
+                lines.push "    Lerp(#{p.from.get_label()},"
+                lines.push "         #{p.to.get_label()}, t)"
+
+            when 7
+              if label.length < 4
+                lines.push "#{label} = Lerp(#{p.from.get_label()},"
+              else
+                lines.push "#{label} ="
+                lines.push "    Lerp(#{p.from.get_label()},"
+
+              lines.push "         #{p.to.get_label()},"
+              lines.push "         t)"
+
+            else
+              lines.push "#{label} = Lerp(#{p.from.get_label()}, #{p.to.get_label()}, t)"
+
+        else
+          # normal
+          if order > 0
+            lines.push "#{label} = Lerp(#{p.from.get_label()}, #{p.to.get_label()}, t)"
+          else
+            lines.push "#{label} = <#{parseInt(p.position.x, 10)}, #{parseInt(p.position.y, 10)}>"
+
+    lines.join("\n")
+
+  update_at: (t) =>
+    for order in @points
+      for p in order
+        p.update(t)
+
+
+class Spline extends Curve
+  @min_points: 2
+  @max_points: 8
+
+  @initial_points: [
+    [ 0.06, 0.82 ],
+    [ 0.15, 0.08 ],
+    [ 0.72, 0.18 ],
+    [ 0.88, 0.90 ]
+  ]
+
+  update_at: (t) =>
+    for order in @points
+      for p in order
+        p.update(t)
+
+
+  get_algorithm_text: ->
+    ''
+
+class LERPingSplines
   @create_point_margin: 0.12
 
   @point_radius: 5
@@ -286,8 +718,8 @@ class LERPingSplines
       max_x: @graph_width  - LERPingSplines.point_label_flip_margin
       max_y: @graph_height - LERPingSplines.point_label_flip_margin
 
-    @points = []
-    @enabled_points = 0
+    @bezier_curve = new Bezier()
+    @spline_curve = new Spline()
 
     @tvar = @context.getElementById('tvar')
 
@@ -322,32 +754,24 @@ class LERPingSplines
     @remove_point_btn = @find_element('remove_point')
     @remove_point_btn?.addEventListener('click', @on_remove_point_btn_click)
 
+    @algorithmbox   = @find_element('algorithmbox')
+    @algorithm_text = @find_element('algorithm_text')
+
+    @bezier_curve.add_initial_points()
+    @spline_curve.add_initial_points()
+
+    @option.mode.change()
+
     @context.addEventListener('mousemove', @on_mousemove)
     @context.addEventListener('mousedown', @on_mousedown)
     @context.addEventListener('mouseup',   @on_mouseup)
 
-    @pen_label = 'P'
-    @pen_label_metrics = APP.graph_ctx.measureText(@pen_label)
-    @pen_label_width   = @pen_label_metrics.width
-    @pen_label_height  = LERPingSplines.pen_label_height
-    @pen_label_offset =
-      x: @pen_label_width  / 2
-      y: @pen_label_height / 2
-
-    @pen_label_offset_length = Vec2.magnitude(@pen_label_offset)
-
-    @algorithmbox   = @find_element('algorithmbox')
-    @algorithm_text = @find_element('algorithm_text')
-
     console.log('init() completed!')
 
-    @option.mode.change()
-
-    @add_initial_points()
     @update()
     @stop()
 
-    @debug("Ready!")
+    #@debug("Ready!")
 
   debug: (msg_text) ->
     console.log(msg_text)
@@ -419,183 +843,18 @@ class LERPingSplines
   loop_stop: ->
     @loop_running = false
 
-  add_initial_points: ->
-    margin = LERPingSplines.create_point_margin
-    range = 1.0 - (2.0 * margin)
-
-    @points[0] = []
-    for i in [0..LERPingSplines.max_points]
-      x = margin + (range * Math.random())
-      y = margin + (range * Math.random())
-      @points[0][i] = new Point(x * @graph_width, y * @graph_height)
-      @points[0][i].set_label( LERPingSplines.point_labels[i] )
-
-    for order in [1..LERPingSplines.max_points]
-      @points[order] = []
-      prev_order = order - 1
-      prev = @points[prev_order]
-      for j in [0..(LERPingSplines.max_points - order)]
-        lerp = new LERP( order, prev[j], prev[j+1] )
-        @points[order][j] = lerp
-        @points[order][j].generate_label(order, j)
-
-    @enable_point_at( 0.06, 0.82 )
-    #@enable_point_at( 0.15, 0.08 )
-    @enable_point_at( 0.72, 0.18 )
-    #@enable_point_at( 0.88, 0.90 )
-
-    @update_enabled_points()
-
-    console.log('Initial points created!')
-
-  find_point: (x, y) ->
-    return null unless @points? and @points[0]?
-    for p in @points[0]
-      if p?.contains(x, y)
-        return p    
-    return null
-
-  update_enabled_points: ->
-    if @enabled_points < LERPingSplines.max_points
-      @add_point_btn.disabled = false
-    else
-      @add_point_btn.disabled = true
-
-    if @enabled_points > LERPingSplines.min_points
-      @remove_point_btn.disabled = false
-    else
-      @remove_point_btn.disabled = true
-
-    @num_points.textContent = "#{@enabled_points}"
-
-    @update()
-
-    p = null
-    for i in [(LERPingSplines.max_points - 1)..1]
-      p = @points[i][0]
-      if p?.enabled
-        break
-    if p?
-      @pen = p
-      @pen.update_order_0_point_label_color()
-    else
-      @debug("ERROR: no pen?!")
-
-    @update_algorithm()
-
-  enable_point: (rebalance_points) ->
-    return if @enabled_points >= LERPingSplines.max_points
-    p = @points[0][@enabled_points]
-
-    if rebalance_points and @option.rebalance_points_on_order_up.value
-      cur_id = @enabled_points
-      prev_id = cur_id - 1
-      while prev_id >= 0
-        cur  = @points[0][cur_id]
-        prev = @points[0][prev_id]
-
-        k = @enabled_points
-
-        x = ((k - cur_id) / k) * cur.position.x + (cur_id / k) * prev.position.x
-        y = ((k - cur_id) / k) * cur.position.y + (cur_id / k) * prev.position.y
-
-        cur.move(x, y)
-
-        cur_id--
-        prev_id--
-
-    p.enabled = true
-    @enabled_points += 1
-    @update_enabled_points()
-    p
-
-  enable_point_at: (x, y) ->
-    p = @enable_point(false)
-    p.x = x * @graph_width
-    p.y = y * @graph_height
-    p
-
-  compute_lower_order_curve: ->
-    points = @points[0].map (point) ->
-      return
-        x: point.position.x
-        y: point.position.y
-
-    `/* copied from: https://pomax.github.io/bezierinfo/chapters/reordering/reorder.js */
-
-    // Based on https://www.sirver.net/blog/2011/08/23/degree-reduction-of-bezier-curves/
-
-    // TODO: FIXME: this is the same code as in the old codebase,
-    //              and it does something odd to the either the
-    //              first or last point... it starts to travel
-    //              A LOT more than it looks like it should... O_o
-
-    p = points,
-    k = p.length,
-    data = [],
-    n = k-1;
-
-    //if (k <= 3) return;
-
-    // build M, which will be (k) rows by (k-1) columns
-    for(let i=0; i<k; i++) {
-      data[i] = (new Array(k - 1)).fill(0);
-      if(i===0) { data[i][0] = 1; }
-      else if(i===n) { data[i][i-1] = 1; }
-      else {
-        data[i][i-1] = i / k;
-        data[i][i] = 1 - data[i][i-1];
-      }
-    }
-
-    // Apply our matrix operations:
-    const M = new Matrix(data);
-    const Mt = M.transpose(M);
-    const Mc = Mt.multiply(M);
-    const Mi = Mc.invert();
-
-    if (!Mi) {
-      return console.error('MtM has no inverse?');
-    }
-
-    // And then we map our k-order list of coordinates
-    // to an n-order list of coordinates, instead:
-    const V = Mi.multiply(Mt);
-    const x = new Matrix(points.map(p => [p.x]));
-    const nx = V.multiply(x);
-    const y = new Matrix(points.map(p => [p.y]));
-    const ny = V.multiply(y);
-
-    points = nx.data.map((x,i) => ({
-      x: x[0],
-      y: ny.data[i][0]
-    }));`
-
-    for i in [0...points.length]
-      p = @clamp_to_canvas(points[i])
-      @points[0][i].move(p.x, p.y)
-    
-  disable_point: ->
-    return if @enabled_points <= LERPingSplines.min_points
-
-    if @enabled_points > 3 and @option.rebalance_points_on_order_down.value
-      @compute_lower_order_curve()
-
-    @enabled_points -= 1
-    p = @points[0][@enabled_points]
-    p.enabled = false
-    @update_enabled_points()
-
   configure_for_bezier_mode: ->
     console.log("configure for mode: bezier")
     @bezier_mode = true
     @spline_mode = false
+    @curve = @bezier_curve
     @update_and_draw()
 
   configure_for_spline_mode: ->
     console.log("configure for mode: spline")
     @bezier_mode = false
     @spline_mode = true
+    @curve = @spline_curve
     @update_and_draw()
 
   change_mode: (mode, update_opt = true) ->
@@ -626,11 +885,11 @@ class LERPingSplines
     @update_algorithm()
 
   on_add_point_btn_click: (event, ui) =>
-    @enable_point(true)
+    @curve.enable_point(true)
     @update_and_draw()
 
   on_remove_point_btn_click: (event, ui) =>
-    @disable_point()
+    @curve.disable_point()
     @update_and_draw()
 
   on_btn_play_pause_click: (event, ui) =>
@@ -692,59 +951,10 @@ class LERPingSplines
     @btn_play_pause.innerHTML = "&#x23F5;"
 
   update_algorithm: ->
-    if !@option.show_algorithm.value
-      return
+    return unless @curve?
 
-    lines = []
-    for order in [0..(@enabled_points - 1)]
-      if order > 0
-        lines.push ""
-        lines.push "### Order #{order} Bezier"
-      else
-        lines.push "### Points"
-
-      for p in @points[order]
-        continue unless p.enabled
-
-        label = if p is @pen then @pen_label else p.get_label()
-
-        if@option.alt_algorithm_names.value
-          # alt
-          switch order
-            when 0
-              lines.push "#{label} = <#{parseInt(p.position.x, 10)}, #{parseInt(p.position.y, 10)}>"
-
-            when 6
-              if label.length < 4
-                lines.push "#{label} = Lerp(#{p.from.get_label()}, #{p.to.get_label()}, t)"
-
-              else
-                lines.push "#{label} ="
-                lines.push "    Lerp(#{p.from.get_label()},"
-                lines.push "         #{p.to.get_label()}, t)"
-
-            when 7
-              if label.length < 4
-                lines.push "#{label} = Lerp(#{p.from.get_label()},"
-              else
-                lines.push "#{label} ="
-                lines.push "    Lerp(#{p.from.get_label()},"
-
-              lines.push "         #{p.to.get_label()},"
-              lines.push "         t)"
-
-            else
-              lines.push "#{label} = Lerp(#{p.from.get_label()}, #{p.to.get_label()}, t)"
-
-        else
-          # normal
-          if order > 0
-            lines.push "#{label} = Lerp(#{p.from.get_label()}, #{p.to.get_label()}, t)"
-          else
-            lines.push "#{label} = <#{parseInt(p.position.x, 10)}, #{parseInt(p.position.y, 10)}>"
-
-
-    @algorithm_text.innerText = lines.join("\n")
+    if @option.show_algorithm.value
+      @algorithm_text.innerText = @curve.get_algorithm_text()
 
   on_show_algorithm_true: =>
     @algorithmbox.classList.remove('hidden')
@@ -779,7 +989,7 @@ class LERPingSplines
 
   on_mousemove_canvas: (event) =>
     mouse = @get_mouse_coord(event)
-    for order in @points
+    for order in @curve.points
       for p in order
         oldx = p.x
         oldy = p.y
@@ -815,7 +1025,7 @@ class LERPingSplines
   on_mousedown: (event) =>
     @point_has_changed = false
     mouse = @get_mouse_coord(event)
-    p = @find_point(mouse.x, mouse.y)
+    p = @curve.find_point(mouse.x, mouse.y)
     if p?
       p.selected = true
 
@@ -824,7 +1034,7 @@ class LERPingSplines
     @tslider.handle.classList.remove('drag')
 
   on_mouseup_canvas: (event) =>
-    for order in @points
+    for order in @curve.points
       for p in order
         p.selected = false
 
@@ -837,195 +1047,33 @@ class LERPingSplines
     else
       @on_mouseup_canvas(event)
 
+  draw: =>
+    @curve.draw()
+
   redraw_ui: (render_bitmap_preview = true) =>
     @graph_ui_ctx.clearRect(0, 0, @graph_ui_canvas.width, @graph_ui_canvas.height)
 
-    @cur?.draw_ui()
+    #@cur?.draw_ui()
 
-    for order in @points
+    for order in @canvas.points
       for p in order
         p.draw_ui()
 
     return null
 
-  update_bezier_mode_at: (t) =>
-    for order in @points
-      for p in order
-        p.update(t)
-
-  update_spline_mode_at: (t) =>
-
   update_at: (t) =>
-    if @bezier_mode
-      @update_bezier_mode_at(t)
-    else if @spline_mode
-      @update_spline_mode_at(t)
-    else
-      @fatal_error("no mode set during update() running=#{@running}")
+    @curve.update_at(t)
 
   update: =>
     @update_at(@t)
 
-  draw_bezier: ->
-    return unless @points? and @points[0]?
-
-    start = @points[0][0]
-
-    p = null
-    for i in [(LERPingSplines.max_points - 1)..1]
-      p = @points[i][0]
-      if p?.enabled
-        break
-
-    @debug("missing pen") unless @pen?
-    if p isnt @pen
-      console.log('p',p)
-      console.log('@pen',@pen)
-    p = @pen
-
-    ctx = @graph_ctx
-    ctx.beginPath()
-    ctx.strokeStyle = p.color
-    ctx.lineWidth = 3
-
-    t = 0.0
-    @update_at(t)
-    ctx.moveTo(p.position.x, p.position.y)
-    while t < 1.0
-      t += 0.02
-      @update_at(t)
-      ctx.lineTo(p.position.x, p.position.y)
-
-    ctx.stroke()
-
-  draw: ->
-    return unless @points? and @points[0]?
-
-    for order in @points
-      for p in order
-        if p.order > 1
-          p.draw()
-    for p in @points[1]
-      p.draw()
-    for p in @points[0]
-      p.draw()
-
-  get_normal: ->
-    @update_at(@t - @t_step)
-    @pen.prev_position.x = @pen.position.x
-    @pen.prev_position.y = @pen.position.y
-    @update()
-
-    if @pen.prev_position.x? and @pen.prev_position.y?
-      normal =
-        x: -(@pen.position.y - @pen.prev_position.y)
-        y:  (@pen.position.x - @pen.prev_position.x)
-
-      Vec2.normalize(normal)
-    else
-      null
-
-  draw_pen: ->
-    return unless @pen?
-    normal = @get_normal()
-    if normal?
-      arrow       = Vec2.scale(normal, 22.0)
-      arrowtip    = Vec2.scale(normal, 15.0)
-      arrow_shaft = Vec2.scale(normal, 65.0)
-
-      angle = TAU / 8.0
-      arrow_side1 = Vec2.rotate(arrow, angle)
-      arrow_side2 = Vec2.rotate(arrow, -angle)
-
-      arrowtip.x += @pen.position.x
-      arrowtip.y += @pen.position.y
-
-      ctx = @graph_ctx
-      ctx.beginPath()
-      ctx.moveTo(arrowtip.x, arrowtip.y)
-      ctx.lineTo(arrowtip.x + arrow_shaft.x, arrowtip.y + arrow_shaft.y)
-      ctx.moveTo(arrowtip.x, arrowtip.y)
-      ctx.lineTo(arrowtip.x + arrow_side1.x, arrowtip.y + arrow_side1.y)
-      ctx.moveTo(arrowtip.x, arrowtip.y)
-      ctx.lineTo(arrowtip.x + arrow_side2.x, arrowtip.y + arrow_side2.y)
-      ctx.strokeStyle = '#000000'
-      ctx.lineWidth = 2
-      ctx.lineCap = "round"
-      ctx.stroke()
-
-      plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), @pen_label_offset_length + 3)
-      plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - @pen_label_offset.x
-      ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - @pen_label_offset.y + @pen_label_height
-      ctx.fillStyle = '#000'
-      ctx.fillText(@pen_label, plx, ply);
-
-  draw_tick_at: (t, size) ->
-    return unless @pen?
-    t_save = @t
-
-    @t = t
-    normal = @get_normal()
-    if normal?
-      normal = Vec2.scale(normal, 3 + (4.0 * size))
-
-      point_a_x = @pen.position.x + normal.x
-      point_a_y = @pen.position.y + normal.y
-
-      point_b_x = @pen.position.x - normal.x
-      point_b_y = @pen.position.y - normal.y
-
-      ctx = @graph_ctx
-      ctx.beginPath()
-      ctx.moveTo(point_a_x, point_a_y)
-      ctx.lineTo(point_b_x, point_b_y)
-      ctx.strokeStyle = '#000000'
-      ctx.lineWidth = if size > 3 then 2 else 1
-      ctx.stroke()
-
-    @t = t_save
-
-  draw_ticks: ->
-    @draw_tick_at(0.0,     5)
-    @draw_tick_at(0.03125, 1)
-    @draw_tick_at(0.0625,  2)
-    @draw_tick_at(0.09375, 1)
-    @draw_tick_at(0.125,   3)
-    @draw_tick_at(0.15625, 1)
-    @draw_tick_at(0.1875,  2)
-    @draw_tick_at(0.21875, 1)
-    @draw_tick_at(0.25,    4)
-    @draw_tick_at(0.28125, 1)
-    @draw_tick_at(0.3125,  2)
-    @draw_tick_at(0.34375, 1)
-    @draw_tick_at(0.375,   3)
-    @draw_tick_at(0.40625, 1)
-    @draw_tick_at(0.4375,  2)
-    @draw_tick_at(0.46875, 1)
-    @draw_tick_at(0.5,     5)
-    @draw_tick_at(0.53125, 1)
-    @draw_tick_at(0.5625,  2)
-    @draw_tick_at(0.59375, 1)
-    @draw_tick_at(0.625,   3)
-    @draw_tick_at(0.65625, 1)
-    @draw_tick_at(0.6875,  2)
-    @draw_tick_at(0.71875, 1)
-    @draw_tick_at(0.75,    4)
-    @draw_tick_at(0.78125, 1)
-    @draw_tick_at(0.8125,  2)
-    @draw_tick_at(0.84375, 1)
-    @draw_tick_at(0.875,   3)
-    @draw_tick_at(0.90625, 1)
-    @draw_tick_at(0.9375,  2)
-    @draw_tick_at(0.96875, 1)
-    @draw_tick_at(1.0,     5)
-
   update_and_draw: ->
     @graph_ctx.clearRect(0, 0, @graph_canvas.width, @graph_canvas.height)
-    @draw_ticks() if @option.show_ticks.value
-    @draw_bezier()
+    @curve.draw_ticks() if @option.show_ticks.value
+    @curve.draw_bezier()
     @update()
-    @draw()
-    @draw_pen() if @option.show_pen_label.value
+    @curve.draw()
+    @curve.draw_pen() if @option.show_pen_label.value
 
   update_callback: (timestamp) =>
     @frame_is_scheduled = false
@@ -1038,7 +1086,7 @@ class LERPingSplines
 
     @schedule_next_frame() if @running
     return null
- 
+
   schedule_next_frame: =>
     if @running
       unless @frame_is_scheduled
