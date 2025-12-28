@@ -1903,7 +1903,7 @@ class Matrix {
     };
 
     Spline.prototype.rebuild_spline = function(initial_points) {
-      var cidx, end_idx, i, index, j, l, label, len, m, margin, next, o, p, pidx, point, pos, prev, range, ref, ref1, results, seg_points, start_idx;
+      var cidx, end_idx, i, index, j, l, label, len, len1, m, margin, next, o, p, pidx, point, pos, prev, range, ref, ref1, seg_points, start_idx, u;
       if (initial_points == null) {
         initial_points = null;
       }
@@ -1937,7 +1937,6 @@ class Matrix {
           }
         }
       }
-      results = [];
       for (i = o = 0, ref1 = this.max_segments(); 0 <= ref1 ? o <= ref1 : o >= ref1; i = 0 <= ref1 ? ++o : --o) {
         start_idx = i * this.order;
         end_idx = start_idx + this.order + 1;
@@ -1949,20 +1948,29 @@ class Matrix {
         this.segment[i].disable_ui();
         this.segment[i].set_points(seg_points);
         this.segment[i].enabled = true;
-        results.push((function() {
-          var len1, results1, u;
-          results1 = [];
-          for (u = 0, len1 = seg_points.length; u < len1; u++) {
-            p = seg_points[u];
-            if (!p.enabled) {
-              this.segment[i].enabled = false;
-              break;
-            } else {
-              results1.push(void 0);
-            }
+        for (u = 0, len1 = seg_points.length; u < len1; u++) {
+          p = seg_points[u];
+          if (!p.enabled) {
+            this.segment[i].enabled = false;
+            break;
           }
-          return results1;
-        }).call(this));
+        }
+      }
+      return this.mirror_knot_neighbors();
+    };
+
+    Spline.prototype.mirror_knot_neighbors = function() {
+      var dx, dy, p, ref, results;
+      ref = this.each_knot();
+      results = [];
+      for (p of ref) {
+        if (!((p.prev != null) && (p.next != null))) {
+          continue;
+        }
+        dx = p.next.x - p.x;
+        dy = p.next.y - p.y;
+        p.prev.x = p.x - dx;
+        results.push(p.prev.y = p.y - dy);
       }
       return results;
     };
@@ -2575,14 +2583,25 @@ class Matrix {
           }
           p.x = mouse.x;
           p.y = mouse.y;
-          if (this.spline_mode && (this.curve.order === 3) && APP.option.connect_cubic_control_points.get() && p.knot) {
-            if (p.prev) {
-              p.prev.x += dx;
-              p.prev.y += dy;
-            }
-            if (p.next) {
-              p.next.x += dx;
-              p.next.y += dy;
+          if (this.spline_mode && (this.curve.order === 3) && APP.option.connect_cubic_control_points.get()) {
+            if (p.knot) {
+              if (p.prev) {
+                p.prev.x += dx;
+                p.prev.y += dy;
+              }
+              if (p.next) {
+                p.next.x += dx;
+                p.next.y += dy;
+              }
+            } else {
+              if (p.prev.knot) {
+                p.prev.prev.x -= dx;
+                p.prev.prev.y -= dy;
+              }
+              if (p.next.knot) {
+                p.next.next.x -= dx;
+                p.next.next.y -= dy;
+              }
             }
           }
         }

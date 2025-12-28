@@ -824,6 +824,17 @@ class Spline extends Curve
           @segment[i].enabled = false;
           break
 
+    @mirror_knot_neighbors()
+
+  mirror_knot_neighbors: ->
+    for p from @each_knot()
+      continue unless p.prev? and p.next?
+
+      dx = p.next.x - p.x
+      dy = p.next.y - p.y
+      p.prev.x = p.x - dx
+      p.prev.y = p.y - dy
+
   each_knot: ->
     return unless @segment?
     first = true
@@ -1277,13 +1288,21 @@ class LERPingSplines
         p.x = mouse.x
         p.y = mouse.y
 
-        if @spline_mode && (@curve.order == 3) && APP.option.connect_cubic_control_points.get() && p.knot
-          if p.prev
-            p.prev.x += dx
-            p.prev.y += dy
-          if p.next
-            p.next.x += dx
-            p.next.y += dy
+        if @spline_mode && (@curve.order == 3) && APP.option.connect_cubic_control_points.get()
+          if p.knot
+            if p.prev
+              p.prev.x += dx
+              p.prev.y += dy
+            if p.next
+              p.next.x += dx
+              p.next.y += dy
+          else
+            if p.prev.knot
+              p.prev.prev.x -= dx
+              p.prev.prev.y -= dy
+            if p.next.knot
+              p.next.next.x -= dx
+              p.next.next.y -= dy
 
       oldhover = p.hover
       if p.contains(mouse.x, mouse.y)
