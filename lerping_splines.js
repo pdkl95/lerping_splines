@@ -1237,7 +1237,6 @@ class Matrix {
         this.points[order] = [];
         prev_order = order - 1;
         prev = this.points[prev_order];
-        console.log("adding LERPs order " + order);
         results.push((function() {
           var m, ref1, results1;
           results1 = [];
@@ -1307,10 +1306,8 @@ class Matrix {
       for (i = l = ref = this.max_points() - 1; ref <= 1 ? l <= 1 : l >= 1; i = ref <= 1 ? ++l : --l) {
         p = this.points[i][0];
         if (p != null ? p.enabled : void 0) {
-          console.log("Pen '" + p.label + "' at layer " + i, p);
           break;
         }
-        console.log("skip layer " + i);
       }
       if (p != null) {
         this.pen = p;
@@ -1785,11 +1782,19 @@ class Matrix {
     };
 
     Spline.prototype.t_max = function() {
-      return this.segment_count;
+      return this.segment_count - 1;
     };
 
     Spline.prototype.set_t_segment = function(value) {
       return this.t_segment = value;
+    };
+
+    Spline.prototype.current_segment = function() {
+      if (APP.t_real === this.t_max()) {
+        return this.segment[this.t_segment - 1];
+      } else {
+        return this.segment[this.t_segment];
+      }
     };
 
     Spline.prototype.min_points = function() {
@@ -1916,7 +1921,6 @@ class Matrix {
             prev = this.points[pidx - this.order];
             next = this.points[pidx];
             pos = Vec2.lerp(prev, next, j / this.order);
-            console.log("pos", pos);
             this.points[cidx].enabled = true;
             this.points[cidx].x = pos.x;
             this.points[cidx].y = pos.y;
@@ -2034,6 +2038,16 @@ class Matrix {
 
     Spline.prototype.draw_ticks = function() {
       return this.call_on_each_segment('draw_ticks');
+    };
+
+    Spline.prototype.draw_pen = function() {
+      var s;
+      s = this.current_segment();
+      if (s != null) {
+        return s.draw_pen();
+      } else {
+        return console.log("no current segment");
+      }
     };
 
     Spline.prototype.draw = function() {
@@ -2410,7 +2424,7 @@ class Matrix {
       }
       this.tslider.position = x;
       this.tslider.handle.style.left = x + "px";
-      return this.set_t((x - this.tslider.min) / this.tslider.range);
+      return this.set_t_perc((x - this.tslider.min) / this.tslider.range);
     };
 
     LERPingSplines.prototype.on_tslider_bg_click = function(event) {
@@ -2436,29 +2450,37 @@ class Matrix {
 
     LERPingSplines.prototype.set_t = function(value) {
       var max;
-      this.t = value;
+      this.t_real = value;
+      max = this.curve.t_max();
+      while (this.t_real > max) {
+        this.t_real -= max;
+      }
+      this.t_perc = (this.t_real - this.curve.t_min()) / max;
+      this.t = this.t_real;
       if (this.t > 0) {
         if (this.spline_mode) {
-          this.curve.set_t_segment(Math.floor(this.t));
-          this.t = this.t - this.curve.t_segment;
-        } else {
-          max = this.curve.t_max();
-          while (this.t > max) {
-            this.t -= max;
-          }
+          this.curve.set_t_segment(Math.floor(this.t_real));
+          this.t = this.t_real - this.curve.t_segment;
         }
       }
-      this.tvar.textContent = this.t.toFixed(2);
-      if (this.t === this.curve.t_min()) {
+      this.tvar.textContent = this.t_real.toFixed(2);
+      if (this.t_real === this.curve.t_min()) {
         this.tslider_btn_min.disabled = true;
       } else {
         this.tslider_btn_min.disabled = false;
       }
-      if (this.t === this.curve.t_max()) {
+      if (this.t_real >= this.curve.t_max()) {
+        this.t = 1.0;
         return this.tslider_btn_max.disabled = true;
       } else {
         return this.tslider_btn_max.disabled = false;
       }
+    };
+
+    LERPingSplines.prototype.set_t_perc = function(value) {
+      var min;
+      min = this.curve.t_min();
+      return this.set_t((value * (this.curve.t_max() - min)) + min);
     };
 
     LERPingSplines.prototype.start = function() {
@@ -2674,8 +2696,8 @@ class Matrix {
       elapsed = timestamp - this.prev_anim_timestamp;
       if (elapsed > 0) {
         this.prev_anim_timestamp = this.anim_timestamp;
-        this.set_t(this.t + this.t_step);
-        this.set_tslider_position(this.tslider.min + (this.t * this.tslider.range));
+        this.set_t_perc(this.t_perc + this.t_step);
+        this.set_tslider_position(this.tslider.min + (this.t_perc * this.tslider.range));
         this.update_and_draw();
       }
       if (this.running) {

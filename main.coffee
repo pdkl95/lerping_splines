@@ -241,7 +241,6 @@ class Curve
       @points[order] = []
       prev_order = order - 1
       prev = @points[prev_order]
-      console.log("adding LERPs order #{order}")
       for j in [0..(@max_points() - order)]
         #console.log("order=#{order} j=#{j}", prev)
         break unless prev[j]? and prev[j+1]?
@@ -289,9 +288,7 @@ class Curve
     for i in [(@max_points() - 1)..1]
       p = @points[i][0]
       if p?.enabled
-        console.log("Pen '#{p.label}' at layer #{i}", p)
         break
-      console.log("skip layer #{i}")
     if p?
       @pen = p
       @pen.update_order_0_point_label_color()
@@ -688,10 +685,16 @@ class Spline extends Curve
     0.0
 
   t_max: ->
-    @segment_count
+    @segment_count - 1
 
   set_t_segment: (value) ->
     @t_segment = value
+
+  current_segment: ->
+    if APP.t_real == @t_max()
+      @segment[@t_segment-1]
+    else
+      @segment[@t_segment]
 
   min_points: ->
     @min_order() + 1
@@ -789,7 +792,6 @@ class Spline extends Curve
           prev = @points[pidx - @order]
           next = @points[pidx]
           pos = Vec2.lerp(prev, next, j / @order)
-          console.log("pos", pos)
           @points[cidx].enabled = true
           @points[cidx].x = pos.x
           @points[cidx].y = pos.y
@@ -850,7 +852,14 @@ class Spline extends Curve
 
   draw_ticks: ->
     @call_on_each_segment('draw_ticks')
- 
+
+  draw_pen: ->
+    s = @current_segment()
+    if s?
+      s.draw_pen()
+    else
+      console.log("no current segment")
+
   draw: ->
     @call_on_each_segment('draw')
 
@@ -1150,7 +1159,7 @@ class LERPingSplines
 
     @tslider.position = x
     @tslider.handle.style.left = "#{x}px"
-    @set_t( (x - @tslider.min) / @tslider.range )
+    @set_t_perc( (x - @tslider.min) / @tslider.range )
 
   on_tslider_bg_click: (event) =>
     cc = @tslider_bg.getBoundingClientRect()
@@ -1170,26 +1179,33 @@ class LERPingSplines
     @update_and_draw()
 
   set_t: (value) ->
-    @t = value
+    @t_real = value 
+    max = @curve.t_max()
+    @t_real -= max while @t_real > max
+    @t_perc = (@t_real - @curve.t_min()) / max
+
+    @t = @t_real
     if @t > 0
       if @spline_mode
-        @curve.set_t_segment(Math.floor(@t))
-        @t = @t - @curve.t_segment
-      else
-        max = @curve.t_max()
-        @t -= max while @t > max
+        @curve.set_t_segment(Math.floor(@t_real))
+        @t = @t_real - @curve.t_segment
 
-    @tvar.textContent = (@t.toFixed(2))
+    @tvar.textContent = (@t_real.toFixed(2))
 
-    if @t == @curve.t_min()
+    if @t_real == @curve.t_min()
       @tslider_btn_min.disabled = true
     else
       @tslider_btn_min.disabled = false
 
-    if @t == @curve.t_max()
+    if @t_real >= @curve.t_max()
+      @t = 1.0
       @tslider_btn_max.disabled = true
     else
       @tslider_btn_max.disabled = false
+
+  set_t_perc: (value) ->
+    min = @curve.t_min()
+    @set_t( (value * (@curve.t_max() - min)) + min )
 
   start: =>
     if @running
@@ -1342,8 +1358,9 @@ class LERPingSplines
     elapsed = timestamp - @prev_anim_timestamp
     if elapsed > 0
       @prev_anim_timestamp = @anim_timestamp
-      @set_t( @t + @t_step )
-      @set_tslider_position(@tslider.min + (@t * @tslider.range))
+      #console.log('t', @t, 't_real', @t_real, 't_perc', @t_perc, 't_step', @t_step)
+      @set_t_perc( @t_perc + @t_step )
+      @set_tslider_position(@tslider.min + (@t_perc * @tslider.range))
       @update_and_draw()
 
     @schedule_next_frame() if @running
