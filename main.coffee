@@ -163,15 +163,22 @@ class LERP extends Point
     #console.log("draw lerp<#{@order}> at [#{@position.x},#{@position.y}]")
     ctx = APP.graph_ctx
 
-    ctx.beginPath()
-    ctx.strokeStyle = @color
-    ctx.lineWidth = 1
-    ctx.moveTo(@from.position.x, @from.position.y)
-    ctx.lineTo(@to.position.x, @to.position.y)
-    ctx.stroke()
+    draw_from_to_line = true
+
+    if APP.spline_mode
+      unless @from.knot or @to.knot
+        draw_from_to_line = false
+
+    if draw_from_to_line
+      ctx.beginPath()
+      ctx.strokeStyle = @color
+      ctx.lineWidth = 1
+      ctx.moveTo(@from.position.x, @from.position.y)
+      ctx.lineTo(@to.position.x, @to.position.y)
+      ctx.stroke()
 
     ctx.beginPath()
-    if APP.pen is this
+    if APP.curve.pen is this
       ctx.arc(@position.x, @position.y, @radius + 3, 0, TAU);
       ctx.fillStyle = @color
       ctx.fill()
@@ -186,7 +193,7 @@ class LERP extends Point
       ctx.stroke()
 
   update_order_0_point_label_color: ->
-    return unless APP.points?
+    return unless APP.curve?
 
     rgb = Color.hex2rgb(@color);
     hsv = Color.rgb2hsv(rgb[0], rgb[1], rgb[2]);
@@ -197,7 +204,7 @@ class LERP extends Point
     rgb = Color.hsv2rgb(hsv[0], hsv[1], hsv[2]);
     color = Color.rgbarr2hex(rgb)
 
-    for p in APP.points[0]
+    for p from APP.curve.each_point()
       p.label_color = color
 
 class Curve

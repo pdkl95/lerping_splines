@@ -1122,19 +1122,27 @@ class Matrix {
     };
 
     LERP.prototype.draw = function() {
-      var ctx;
+      var ctx, draw_from_to_line;
       if (!this.enabled) {
         return;
       }
       ctx = APP.graph_ctx;
+      draw_from_to_line = true;
+      if (APP.spline_mode) {
+        if (!(this.from.knot || this.to.knot)) {
+          draw_from_to_line = false;
+        }
+      }
+      if (draw_from_to_line) {
+        ctx.beginPath();
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 1;
+        ctx.moveTo(this.from.position.x, this.from.position.y);
+        ctx.lineTo(this.to.position.x, this.to.position.y);
+        ctx.stroke();
+      }
       ctx.beginPath();
-      ctx.strokeStyle = this.color;
-      ctx.lineWidth = 1;
-      ctx.moveTo(this.from.position.x, this.from.position.y);
-      ctx.lineTo(this.to.position.x, this.to.position.y);
-      ctx.stroke();
-      ctx.beginPath();
-      if (APP.pen === this) {
+      if (APP.curve.pen === this) {
         ctx.arc(this.position.x, this.position.y, this.radius + 3, 0, TAU);
         ctx.fillStyle = this.color;
         ctx.fill();
@@ -1151,8 +1159,8 @@ class Matrix {
     };
 
     LERP.prototype.update_order_0_point_label_color = function() {
-      var color, hsv, l, len, p, ref, results, rgb;
-      if (APP.points == null) {
+      var color, hsv, p, ref, results, rgb;
+      if (APP.curve == null) {
         return;
       }
       rgb = Color.hex2rgb(this.color);
@@ -1165,10 +1173,9 @@ class Matrix {
       hsv[2] *= 0.55;
       rgb = Color.hsv2rgb(hsv[0], hsv[1], hsv[2]);
       color = Color.rgbarr2hex(rgb);
-      ref = APP.points[0];
+      ref = APP.curve.each_point();
       results = [];
-      for (l = 0, len = ref.length; l < len; l++) {
-        p = ref[l];
+      for (p of ref) {
         results.push(p.label_color = color);
       }
       return results;
