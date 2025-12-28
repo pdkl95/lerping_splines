@@ -1822,42 +1822,41 @@ class Matrix {
     };
 
     Spline.prototype.add_initial_points = function(initial_points) {
-      var cidx, i, index, j, l, len, m, margin, n, next, pidx, point, pos, prev, range, ref, ref1, x, y;
+      var cidx, i, index, j, l, label, len, m, margin, n, next, pidx, point, pos, prev, range, ref, ref1, x, y;
       if (initial_points == null) {
         initial_points = this.constructor.initial_points;
       }
       margin = LERPingSplines.create_point_margin;
       range = 1.0 - (2.0 * margin);
-      console.log('max_points', this.max_points());
       this.points[0] = [];
       for (i = l = 0, ref = this.max_points(); 0 <= ref ? l <= ref : l >= ref; i = 0 <= ref ? ++l : --l) {
         x = margin + (range * Math.random());
         y = margin + (range * Math.random());
         this.points[i] = new Point(x * APP.graph_width, y * APP.graph_height);
-        this.points[i].set_label(LERPingSplines.point_labels[i]);
       }
       for (index = m = 0, len = initial_points.length; m < len; index = ++m) {
         point = initial_points[index];
-        pidx = (index * this.order) + 1;
+        pidx = index * this.order;
         this.points[pidx].enabled = true;
-        this.points[pidx].x = (margin + (range * point[0])) * APP.graph_widht;
+        this.points[pidx].x = (margin + (range * point[0])) * APP.graph_width;
         this.points[pidx].y = (margin + (range * point[1])) * APP.graph_height;
         this.points[pidx].set_label(LERPingSplines.point_labels[index]);
         this.segment_count += 1;
         if (index > 0) {
-          for (j = n = 1, ref1 = index; 1 <= ref1 ? n <= ref1 : n >= ref1; j = 1 <= ref1 ? ++n : --n) {
-            cidx = pidx + j;
+          for (j = n = 1, ref1 = this.order - 1; 1 <= ref1 ? n <= ref1 : n >= ref1; j = 1 <= ref1 ? ++n : --n) {
+            cidx = pidx - this.order + j;
             prev = this.points[pidx - this.order];
             next = this.points[pidx];
             pos = Vec2.lerp(prev, next, j / this.order);
+            console.log("pos", pos);
             this.points[cidx].enabled = true;
             this.points[cidx].x = pos.x;
-            this.points[cidx].y = pos.u;
-            this.points[cidx].set_label("" + prev.label + next.label + j);
+            this.points[cidx].y = pos.y;
+            label = "" + prev.label + next.label + j;
+            this.points[cidx].set_label(label);
           }
         }
       }
-      this.log();
       this.rebuild_spline();
       this.log();
       return console.log('Initial points & segments created!');
@@ -1865,15 +1864,16 @@ class Matrix {
 
     Spline.prototype.rebuild_spline = function() {
       var end_idx, i, l, p, ref, results, seg_points, start_idx;
-      console.log("rebuilding spline with up to " + (this.max_segments()) + " segmente");
       results = [];
       for (i = l = 0, ref = this.max_segments(); 0 <= ref ? l <= ref : l >= ref; i = 0 <= ref ? ++l : --l) {
-        this.segment[i] = new Bezier();
-        this.segment[i].disable_ui();
         start_idx = i * this.order;
         end_idx = start_idx + this.order + 1;
-        console.log("giving segment " + i + " points " + start_idx + " -> " + (end_idx - 1));
+        if (end_idx >= this.current_max_points()) {
+          break;
+        }
         seg_points = this.points.slice(start_idx, end_idx);
+        this.segment[i] = new Bezier();
+        this.segment[i].disable_ui();
         this.segment[i].set_points(seg_points);
         this.segment[i].enabled = true;
         results.push((function() {
@@ -1942,7 +1942,7 @@ class Matrix {
 
     LERPingSplines.point_label_flip_margin = 32;
 
-    LERPingSplines.point_labels = "ABCDEFGHIJKLM";
+    LERPingSplines.point_labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
     LERPingSplines.point_label_height = 22;
 

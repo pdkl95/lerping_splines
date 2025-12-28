@@ -724,48 +724,53 @@ class Spline extends Curve
   add_initial_points: (initial_points = @constructor.initial_points) ->
     margin = LERPingSplines.create_point_margin
     range = 1.0 - (2.0 * margin)
-    console.log('max_points', @max_points())
     @points[0] = []
     for i in [0..@max_points()]
       x = margin + (range * Math.random())
       y = margin + (range * Math.random())
       @points[i] = new Point(x * APP.graph_width, y * APP.graph_height)
-      @points[i].set_label( LERPingSplines.point_labels[i] )
+      #@points[i].set_label( LERPingSplines.point_labels[i] )
 
     for point, index in initial_points
-      pidx = (index * @order) + 1
+      pidx = index * @order
+      #console.log(">>pidx=#{pidx} label=\"#{LERPingSplines.point_labels[index]}\"")
       @points[pidx].enabled = true
-      @points[pidx].x = (margin + (range * point[0])) * APP.graph_widht
+      @points[pidx].x = (margin + (range * point[0])) * APP.graph_width
       @points[pidx].y = (margin + (range * point[1])) * APP.graph_height
       @points[pidx].set_label( LERPingSplines.point_labels[index] )
       @segment_count += 1
 
       if index > 0
-        for j in [1..index]
-          cidx = pidx + j
+        for j in [1..(@order-1)]
+          cidx = pidx - @order + j
           prev = @points[pidx - @order]
           next = @points[pidx]
           pos = Vec2.lerp(prev, next, j / @order)
+          console.log("pos", pos)
           @points[cidx].enabled = true
           @points[cidx].x = pos.x
-          @points[cidx].y = pos.u
-          @points[cidx].set_label( "#{prev.label}#{next.label}#{j}" )
+          @points[cidx].y = pos.y
+          label = "#{prev.label}#{next.label}#{j}"
+          @points[cidx].set_label( label )
+          #console.log("  cidx=#{cidx} label=\"#{label}\"")
 
-    @log()
+    #@log()
     @rebuild_spline()
     @log()
 
     console.log('Initial points & segments created!')
 
   rebuild_spline: ->
-    console.log("rebuilding spline with up to #{@max_segments()} segmente")
+    #console.log("rebuilding spline with up to #{@max_segments()} segmente")
     for i in [0..@max_segments()]
-      @segment[i] = new Bezier()
-      @segment[i].disable_ui()
       start_idx = (i * @order)
       end_idx = start_idx + @order + 1
-      console.log("giving segment #{i} points #{start_idx} -> #{end_idx - 1}")
+      break if end_idx >= @current_max_points()
+      #console.log("giving segment #{i} points #{start_idx} -> #{end_idx - 1}")
       seg_points = @points.slice(start_idx, end_idx)
+      #console.log("  -> [ #{seg_points.map( (x) -> "\"#{x.label}\"" ).join(', ')} ]")
+      @segment[i] = new Bezier()
+      @segment[i].disable_ui()
       @segment[i].set_points( seg_points )
       @segment[i].enabled = true;
       for p in seg_points
@@ -800,7 +805,7 @@ class LERPingSplines
   @point_move_margin: 24
   @point_label_flip_margin: 32
 
-  @point_labels: "ABCDEFGHIJKLM"
+  @point_labels: "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
   @point_label_height: 22
 
   @pen_label_height: 22
