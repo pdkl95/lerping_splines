@@ -1207,6 +1207,29 @@ class Matrix {
       return this.constructor.max_points;
     };
 
+    Curve.prototype.each_point = function*(include_first) {
+      var first, l, len, len1, m, order, p, ref;
+      if (include_first == null) {
+        include_first = true;
+      }
+      first = true;
+      ref = this.points;
+      for (l = 0, len = ref.length; l < len; l++) {
+        order = ref[l];
+        for (m = 0, len1 = order.length; m < len1; m++) {
+          p = order[m];
+          if (first) {
+            first = false;
+            if (include_first) {
+              yield p;
+            }
+          } else {
+            yield p;
+          }
+        }
+      }
+    };
+
     Curve.prototype.add_lerps = function() {
       var j, l, lerp, order, prev, prev_order, ref, results;
       results = [];
@@ -1267,13 +1290,9 @@ class Matrix {
     };
 
     Curve.prototype.find_point = function(x, y) {
-      var l, len, p, ref;
-      if (!((this.points != null) && (this.points[0] != null))) {
-        return null;
-      }
-      ref = this.points[0];
-      for (l = 0, len = ref.length; l < len; l++) {
-        p = ref[l];
+      var p, ref;
+      ref = this.each_point();
+      for (p of ref) {
         if (p != null ? p.contains(x, y) : void 0) {
           return p;
         }
@@ -1894,6 +1913,38 @@ class Matrix {
       return results;
     };
 
+    Spline.prototype.each_point = function*() {
+      var first, l, len, p, ref, ref1, results, s;
+      if (this.segment == null) {
+        return;
+      }
+      first = true;
+      ref = this.segment;
+      results = [];
+      for (l = 0, len = ref.length; l < len; l++) {
+        s = ref[l];
+        ref1 = s.each_point(first);
+        for (p of ref1) {
+          yield p;
+        }
+        results.push(first = false);
+      }
+      return results;
+    };
+
+    Spline.prototype.find_point = function(x, y) {
+      var l, len, p, ref, s;
+      ref = this.segment;
+      for (l = 0, len = ref.length; l < len; l++) {
+        s = ref[l];
+        p = s.find_point(x, y);
+        if (p != null) {
+          return p;
+        }
+      }
+      return null;
+    };
+
     Spline.prototype.call_on_each_segment = function(func_name) {
       var l, len, ref, results, s;
       ref = this.segment;
@@ -2415,40 +2466,31 @@ class Matrix {
     };
 
     LERPingSplines.prototype.on_mousemove_canvas = function(event) {
-      var l, len, mouse, oldhover, oldx, oldy, order, p, ref, results;
+      var mouse, oldhover, oldx, oldy, p, ref, results;
       mouse = this.get_mouse_coord(event);
-      ref = this.curve.points;
+      ref = this.curve.each_point();
       results = [];
-      for (l = 0, len = ref.length; l < len; l++) {
-        order = ref[l];
-        results.push((function() {
-          var len1, m, results1;
-          results1 = [];
-          for (m = 0, len1 = order.length; m < len1; m++) {
-            p = order[m];
-            oldx = p.x;
-            oldy = p.y;
-            if (p.selected) {
-              if ((p.x !== mouse.x) || (p.y !== mouse.y)) {
-                this.point_has_changed = true;
-              }
-              p.x = mouse.x;
-              p.y = mouse.y;
-            }
-            oldhover = p.hover;
-            if (p.contains(mouse.x, mouse.y)) {
-              p.hover = true;
-            } else {
-              p.hover = false;
-            }
-            if ((p.hover !== oldhover) || (p.x !== oldx) || (p.y !== oldy)) {
-              results1.push(this.update_and_draw());
-            } else {
-              results1.push(void 0);
-            }
+      for (p of ref) {
+        oldx = p.x;
+        oldy = p.y;
+        if (p.selected) {
+          if ((p.x !== mouse.x) || (p.y !== mouse.y)) {
+            this.point_has_changed = true;
           }
-          return results1;
-        }).call(this));
+          p.x = mouse.x;
+          p.y = mouse.y;
+        }
+        oldhover = p.hover;
+        if (p.contains(mouse.x, mouse.y)) {
+          p.hover = true;
+        } else {
+          p.hover = false;
+        }
+        if ((p.hover !== oldhover) || (p.x !== oldx) || (p.y !== oldy)) {
+          results.push(this.update_and_draw());
+        } else {
+          results.push(void 0);
+        }
       }
       return results;
     };
@@ -2489,14 +2531,10 @@ class Matrix {
     };
 
     LERPingSplines.prototype.on_mouseup_canvas = function(event) {
-      var l, len, len1, m, order, p, ref;
-      ref = this.curve.points;
-      for (l = 0, len = ref.length; l < len; l++) {
-        order = ref[l];
-        for (m = 0, len1 = order.length; m < len1; m++) {
-          p = order[m];
-          p.selected = false;
-        }
+      var p, ref;
+      ref = this.curve.each_point();
+      for (p of ref) {
+        p.selected = false;
       }
       if (this.point_has_changed) {
         return this.update_algorithm();

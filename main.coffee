@@ -225,6 +225,17 @@ class Curve
   max_points: ->
     @constructor.max_points
 
+  each_point: (include_first = true) ->
+    first = true
+    for order in @points
+      for p in order
+        if first
+          first = false
+          yield p if include_first
+        else
+          yield p
+    return
+
   add_lerps: ->
     for order in [1..@max_points()]
       @points[order] = []
@@ -267,10 +278,9 @@ class Curve
     console.log('Initial points created!')
 
   find_point: (x, y) ->
-    return null unless @points? and @points[0]?
-    for p in @points[0]
+    for p from @each_point()
       if p?.contains(x, y)
-        return p    
+        return p
     return null
 
   setup_pen: ->
@@ -778,6 +788,20 @@ class Spline extends Curve
           @segment[i].enabled = false;
           break
 
+  each_point: ->
+    return unless @segment?
+    first = true
+    for s in @segment
+      for p from s.each_point(first)
+        yield p
+      first = false
+
+  find_point: (x, y) ->
+    for s in @segment
+      p = s.find_point(x, y)
+      return p if p?
+    return null
+
   call_on_each_segment: (func_name) ->
     for s in @segment
       if s?.enabled
@@ -1182,24 +1206,23 @@ class LERPingSplines
 
   on_mousemove_canvas: (event) =>
     mouse = @get_mouse_coord(event)
-    for order in @curve.points
-      for p in order
-        oldx = p.x
-        oldy = p.y
-        if p.selected
-          if (p.x != mouse.x) or (p.y != mouse.y)
-            @point_has_changed = true
-          p.x = mouse.x
-          p.y = mouse.y
+    for p from @curve.each_point()
+      oldx = p.x
+      oldy = p.y
+      if p.selected
+        if (p.x != mouse.x) or (p.y != mouse.y)
+          @point_has_changed = true
+        p.x = mouse.x
+        p.y = mouse.y
 
-        oldhover = p.hover
-        if p.contains(mouse.x, mouse.y)
-          p.hover = true
-        else
-          p.hover = false
+      oldhover = p.hover
+      if p.contains(mouse.x, mouse.y)
+        p.hover = true
+      else
+        p.hover = false
 
-        if (p.hover != oldhover) or (p.x != oldx) or (p.y != oldy)
-          @update_and_draw()
+      if (p.hover != oldhover) or (p.x != oldx) or (p.y != oldy)
+        @update_and_draw()
 
   on_mousemove: (event) =>
     if @tslider.drag_active
@@ -1227,9 +1250,8 @@ class LERPingSplines
     @tslider.handle.classList.remove('drag')
 
   on_mouseup_canvas: (event) =>
-    for order in @curve.points
-      for p in order
-        p.selected = false
+    for p from @curve.each_point()
+      p.selected = false
 
     if @point_has_changed
       @update_algorithm()
