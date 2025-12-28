@@ -133,6 +133,20 @@
       return Math.sqrt((v.x * v.x) + (v.y * v.y));
     };
 
+    Vec2.add = function(a, b) {
+      return {
+        x: a.x + b.x,
+        y: a.y + b.y
+      };
+    };
+
+    Vec2.sub = function(a, b) {
+      return {
+        x: a.x - b.x,
+        y: a.y - b.y
+      };
+    };
+
     Vec2.scale = function(v, scale) {
       return {
         x: v.x * scale,
@@ -1960,17 +1974,21 @@ class Matrix {
     };
 
     Spline.prototype.mirror_knot_neighbors = function() {
-      var dx, dy, p, ref, results;
+      var avg_prev, delta, new_prev, p, ref, results;
       ref = this.each_knot();
       results = [];
       for (p of ref) {
-        if (!((p.prev != null) && (p.next != null))) {
+        if (!((p.prev != null) && (p.next != null) && p.prev.enabled && p.next.enabled)) {
           continue;
         }
-        dx = p.next.x - p.x;
-        dy = p.next.y - p.y;
-        p.prev.x = p.x - dx;
-        results.push(p.prev.y = p.y - dy);
+        delta = Vec2.sub(p.next, p);
+        new_prev = Vec2.sub(p, delta);
+        avg_prev = Vec2.lerp(p.prev, new_prev, 0.5);
+        p.prev.x = avg_prev.x;
+        p.prev.y = avg_prev.y;
+        delta = Vec2.sub(p.prev, p);
+        p.next.x = p.x - delta.x;
+        results.push(p.next.y = p.y - delta.y);
       }
       return results;
     };
@@ -2035,6 +2053,8 @@ class Matrix {
       for (l = 0, len = ref.length; l < len; l++) {
         s = ref[l];
         if (s != null ? s.enabled : void 0) {
+          s.pen = s.find_pen();
+          this.pen = s.pen;
           results.push(s[func_name]());
         } else {
           results.push(void 0);
@@ -2060,8 +2080,6 @@ class Matrix {
       s = this.current_segment();
       if (s != null) {
         return s.draw_pen();
-      } else {
-        return console.log("no current segment");
       }
     };
 
@@ -2597,8 +2615,7 @@ class Matrix {
               if (p.prev.knot) {
                 p.prev.prev.x -= dx;
                 p.prev.prev.y -= dy;
-              }
-              if (p.next.knot) {
+              } else if (p.next.knot) {
                 p.next.next.x -= dx;
                 p.next.next.y -= dy;
               }

@@ -828,12 +828,17 @@ class Spline extends Curve
 
   mirror_knot_neighbors: ->
     for p from @each_knot()
-      continue unless p.prev? and p.next?
+      continue unless p.prev? and p.next? and p.prev.enabled and p.next.enabled
 
-      dx = p.next.x - p.x
-      dy = p.next.y - p.y
-      p.prev.x = p.x - dx
-      p.prev.y = p.y - dy
+      delta = Vec2.sub(p.next, p)
+      new_prev = Vec2.sub(p, delta)
+      avg_prev = Vec2.lerp(p.prev, new_prev, 0.5)
+      p.prev.x = avg_prev.x
+      p.prev.y = avg_prev.y
+
+      delta = Vec2.sub(p.prev, p)
+      p.next.x = p.x - delta.x
+      p.next.y = p.y - delta.y
 
   each_knot: ->
     return unless @segment?
@@ -860,6 +865,8 @@ class Spline extends Curve
   call_on_each_segment: (func_name) ->
     for s in @segment
       if s?.enabled
+        s.pen = s.find_pen()
+        @pen = s.pen
         s[func_name]()
 
   update: ->
@@ -875,8 +882,6 @@ class Spline extends Curve
     s = @current_segment()
     if s?
       s.draw_pen()
-    else
-      console.log("no current segment")
 
   draw: ->
     @call_on_each_segment('draw')
@@ -1300,7 +1305,7 @@ class LERPingSplines
             if p.prev.knot
               p.prev.prev.x -= dx
               p.prev.prev.y -= dy
-            if p.next.knot
+            else if p.next.knot
               p.next.next.x -= dx
               p.next.next.y -= dy
 

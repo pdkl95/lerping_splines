@@ -30,6 +30,16 @@ class Vec2
   @magnitude: (v) ->
     Math.sqrt((v.x * v.x) + (v.y * v.y))
 
+  @add: (a, b) ->
+    return
+      x: a.x + b.x
+      y: a.y + b.y
+
+  @sub: (a, b) ->
+    return
+      x: a.x - b.x
+      y: a.y - b.y
+
   @scale: (v, scale) ->
     return
       x: v.x * scale
