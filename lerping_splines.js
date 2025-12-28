@@ -1237,6 +1237,7 @@ class Matrix {
         this.points[order] = [];
         prev_order = order - 1;
         prev = this.points[prev_order];
+        console.log("adding LERPs order " + order);
         results.push((function() {
           var m, ref1, results1;
           results1 = [];
@@ -1306,8 +1307,10 @@ class Matrix {
       for (i = l = ref = this.max_points() - 1; ref <= 1 ? l <= 1 : l >= 1; i = ref <= 1 ? ++l : --l) {
         p = this.points[i][0];
         if (p != null ? p.enabled : void 0) {
+          console.log("Pen '" + p.label + "' at layer " + i, p);
           break;
         }
+        console.log("skip layer " + i);
       }
       if (p != null) {
         this.pen = p;
@@ -1400,22 +1403,27 @@ class Matrix {
       return this.update_at(APP.t);
     };
 
-    Curve.prototype.draw_curve = function() {
-      var ctx, i, l, p, ref, start, t;
-      if (!((this.points != null) && (this.points[0] != null))) {
-        return;
-      }
-      start = this.points[0][0];
-      p = null;
+    Curve.prototype.find_pen = function() {
+      var i, l, p, ref;
       for (i = l = ref = this.max_points() - 1; ref <= 1 ? l <= 1 : l >= 1; i = ref <= 1 ? ++l : --l) {
         p = this.points[i][0];
         if (p != null ? p.enabled : void 0) {
           break;
         }
       }
-      if (this.pen == null) {
+      if (!p) {
         APP.debug("missing pen");
       }
+      return p;
+    };
+
+    Curve.prototype.draw_curve = function() {
+      var ctx, p, start, t;
+      if (!((this.points != null) && (this.points[0] != null))) {
+        return;
+      }
+      start = this.points[0][0];
+      p = this.find_pen();
       ctx = APP.graph_ctx;
       ctx.beginPath();
       ctx.strokeStyle = p.color;
@@ -1538,6 +1546,7 @@ class Matrix {
     };
 
     Curve.prototype.draw_ticks = function() {
+      this.pen = this.find_pen();
       this.draw_tick_at(0.0, 5);
       this.draw_tick_at(0.03125, 1);
       this.draw_tick_at(0.0625, 2);
@@ -2537,7 +2546,7 @@ class Matrix {
           }
           p.x = mouse.x;
           p.y = mouse.y;
-          if (this.spline_mode && (this.curve.order === 3) && APP.option.connect_cubic_control_points.get()) {
+          if (this.spline_mode && (this.curve.order === 3) && APP.option.connect_cubic_control_points.get() && p.knot) {
             if (p.prev) {
               p.prev.x += dx;
               p.prev.y += dy;

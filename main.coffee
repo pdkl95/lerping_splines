@@ -241,6 +241,7 @@ class Curve
       @points[order] = []
       prev_order = order - 1
       prev = @points[prev_order]
+      console.log("adding LERPs order #{order}")
       for j in [0..(@max_points() - order)]
         #console.log("order=#{order} j=#{j}", prev)
         break unless prev[j]? and prev[j+1]?
@@ -288,7 +289,9 @@ class Curve
     for i in [(@max_points() - 1)..1]
       p = @points[i][0]
       if p?.enabled
+        console.log("Pen '#{p.label}' at layer #{i}", p)
         break
+      console.log("skip layer #{i}")
     if p?
       @pen = p
       @pen.update_order_0_point_label_color()
@@ -354,22 +357,21 @@ class Curve
   update: ->
     @update_at(APP.t)
 
-  draw_curve: ->
-    return unless @points? and @points[0]?
-
-    start = @points[0][0]
-
-    p = null
+  find_pen: ->
     for i in [(@max_points() - 1)..1]
       p = @points[i][0]
       if p?.enabled
         break
 
-    APP.debug("missing pen") unless @pen?
-    # if p isnt @pen
-      # console.log('p',p)
-      # console.log('@pen',@pen)
-    #p = @pen
+    APP.debug("missing pen") unless p
+    p
+
+  draw_curve: ->
+    return unless @points? and @points[0]?
+
+    start = @points[0][0]
+
+    p = @find_pen()
 
     ctx = APP.graph_ctx
     ctx.beginPath()
@@ -473,6 +475,8 @@ class Curve
     APP.t = t_save
 
   draw_ticks: ->
+    @pen = @find_pen()
+
     @draw_tick_at(0.0,     5)
     @draw_tick_at(0.03125, 1)
     @draw_tick_at(0.0625,  2)
@@ -1250,7 +1254,7 @@ class LERPingSplines
         p.x = mouse.x
         p.y = mouse.y
 
-        if @spline_mode && (@curve.order == 3) && APP.option.connect_cubic_control_points.get()
+        if @spline_mode && (@curve.order == 3) && APP.option.connect_cubic_control_points.get() && p.knot
           if p.prev
             p.prev.x += dx
             p.prev.y += dy
