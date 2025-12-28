@@ -1045,23 +1045,30 @@ class Matrix {
     };
 
     Point.prototype.draw = function() {
-      var ctx;
+      var ctx, inner_radius, radius;
       if (!this.enabled) {
         return;
       }
       ctx = APP.graph_ctx;
+      radius = this.radius = 5;
+      inner_radius = radius * 0.8;
       if (this.hover) {
         ctx.beginPath();
         ctx.fillStyle = '#ff0';
         ctx.strokeStyle = '#000';
         ctx.lineWidth = 1;
-        ctx.arc(this.x, this.y, this.radius * 3, 0, TAU);
+        ctx.arc(this.x, this.y, radius * 3, 0, TAU);
         ctx.fill();
         ctx.stroke();
+        radius *= 1.5;
+        inner_radius = this.radius * 0.7;
       }
       ctx.beginPath();
+      if (APP.spline_mode && !this.knot) {
+        ctx.arc(this.x, this.y, inner_radius, 0, TAU, true);
+      }
+      ctx.arc(this.x, this.y, radius, 0, TAU);
       ctx.fillStyle = this.color;
-      ctx.arc(this.x, this.y, this.radius, 0, TAU);
       ctx.fill();
       if (this.label) {
         ctx.fillStyle = this.label_color;
@@ -1917,7 +1924,7 @@ class Matrix {
     };
 
     Spline.prototype.rebuild_spline = function(initial_points) {
-      var cidx, end_idx, i, index, j, l, label, len, len1, m, margin, next, o, p, pidx, point, pos, prev, range, ref, ref1, seg_points, start_idx, u;
+      var cidx, end_idx, i, index, j, l, len, len1, m, margin, next, o, p, pidx, point, pos, prev, range, ref, ref1, seg_points, start_idx, u;
       if (initial_points == null) {
         initial_points = null;
       }
@@ -1945,8 +1952,6 @@ class Matrix {
             this.points[cidx].enabled = true;
             this.points[cidx].x = pos.x;
             this.points[cidx].y = pos.y;
-            label = "" + prev.label + next.label + j;
-            this.points[cidx].set_label(label);
             this.points[cidx].knot = false;
           }
         }
@@ -2603,19 +2608,19 @@ class Matrix {
           p.y = mouse.y;
           if (this.spline_mode && (this.curve.order === 3) && APP.option.connect_cubic_control_points.get()) {
             if (p.knot) {
-              if (p.prev) {
+              if (p.prev != null) {
                 p.prev.x += dx;
                 p.prev.y += dy;
               }
-              if (p.next) {
+              if (p.next != null) {
                 p.next.x += dx;
                 p.next.y += dy;
               }
             } else {
-              if (p.prev.knot) {
+              if ((p.prev != null) && (p.prev.prev != null) && p.prev.knot) {
                 p.prev.prev.x -= dx;
                 p.prev.prev.y -= dy;
-              } else if (p.next.knot) {
+              } else if ((p.next != null) && (p.next.next != null) && p.next.knot) {
                 p.next.next.x -= dx;
                 p.next.next.y -= dy;
               }

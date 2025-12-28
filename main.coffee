@@ -87,18 +87,28 @@ class Point
     #console.log('draw point', @x, @y, @color)
     ctx = APP.graph_ctx
 
+    radius = @radius = 5
+    inner_radius = radius * 0.8
+
     if @hover
       ctx.beginPath()
       ctx.fillStyle = '#ff0'
       ctx.strokeStyle = '#000'
       ctx.lineWidth = 1
-      ctx.arc(@x, @y, @radius * 3, 0, TAU)
+      ctx.arc(@x, @y, radius * 3, 0, TAU)
       ctx.fill()
       ctx.stroke()
+      radius *= 1.5
+      inner_radius = @radius * 0.7
 
     ctx.beginPath()
+
+    if APP.spline_mode && !@knot
+      ctx.arc(@x, @y, inner_radius, 0, TAU, true)
+
+    ctx.arc(@x, @y, radius, 0, TAU)
+
     ctx.fillStyle = @color
-    ctx.arc(@x, @y, @radius, 0, TAU)
     ctx.fill()
 
     if @label
@@ -802,10 +812,10 @@ class Spline extends Curve
           @points[cidx].enabled = true
           @points[cidx].x = pos.x
           @points[cidx].y = pos.y
-          label = "#{prev.label}#{next.label}#{j}"
-          @points[cidx].set_label( label )
-          @points[cidx].knot = false
+          #label = "#{prev.label}#{next.label}#{j}"
+          #@points[cidx].set_label( label )
           #console.log("  cidx=#{cidx} label=\"#{label}\"")
+          @points[cidx].knot = false
 
     #console.log("rebuilding spline with up to #{@max_segments()} segmente")
     for i in [0..@max_segments()]
@@ -1295,17 +1305,17 @@ class LERPingSplines
 
         if @spline_mode && (@curve.order == 3) && APP.option.connect_cubic_control_points.get()
           if p.knot
-            if p.prev
+            if p.prev?
               p.prev.x += dx
               p.prev.y += dy
-            if p.next
+            if p.next?
               p.next.x += dx
               p.next.y += dy
           else
-            if p.prev.knot
+            if p.prev? and p.prev.prev? and p.prev.knot
               p.prev.prev.x -= dx
               p.prev.prev.y -= dy
-            else if p.next.knot
+            else if p.next? and p.next.next? and p.next.knot
               p.next.next.x -= dx
               p.next.next.y -= dy
 
