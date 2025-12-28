@@ -669,7 +669,7 @@ class Spline extends Curve
 
     @segment_count = 0
     @segment = []
-    @order = 2
+    @order = 3
 
   log: ->
     console.log("/// Spline State: order=#{@order} segment_count=#{@segment_count}")
@@ -735,11 +735,39 @@ class Spline extends Curve
     margin = LERPingSplines.create_point_margin
     range = 1.0 - (2.0 * margin)
     @points[0] = []
+    prev = null
     for i in [0..@max_points()]
       x = margin + (range * Math.random())
       y = margin + (range * Math.random())
       @points[i] = new Point(x * APP.graph_width, y * APP.graph_height)
       #@points[i].set_label( LERPingSplines.point_labels[i] )
+      if prev?
+        prev.next = @points[i]
+        @points[i].prev = prev
+      prev = @points[i]
+
+    #@log()
+    @rebuild_spline(initial_points)
+    @log()
+
+    console.log('Initial points & segments created!')
+
+  joining_points_for_order: (order) ->
+    n = 0
+    points = []
+    for p in @each_point()
+      if n < 2
+        points.push(p.position)
+        n = order
+      n--
+
+  rebuild_spline: (initial_points = null) ->
+    margin = LERPingSplines.create_point_margin
+    range = 1.0 - (2.0 * margin)
+
+    unless initial_points?
+      initial_points = @joining_points_for_order(@order)
+      console.log('initial_points', initial_points)
 
     for point, index in initial_points
       pidx = index * @order
@@ -748,6 +776,7 @@ class Spline extends Curve
       @points[pidx].x = (margin + (range * point[0])) * APP.graph_width
       @points[pidx].y = (margin + (range * point[1])) * APP.graph_height
       @points[pidx].set_label( LERPingSplines.point_labels[index] )
+      @points[pidx].knot = true
       @segment_count += 1
 
       if index > 0
@@ -762,15 +791,9 @@ class Spline extends Curve
           @points[cidx].y = pos.y
           label = "#{prev.label}#{next.label}#{j}"
           @points[cidx].set_label( label )
+          @points[cidx].knot = false
           #console.log("  cidx=#{cidx} label=\"#{label}\"")
 
-    #@log()
-    @rebuild_spline()
-    @log()
-
-    console.log('Initial points & segments created!')
-
-  rebuild_spline: ->
     #console.log("rebuilding spline with up to #{@max_segments()} segmente")
     for i in [0..@max_segments()]
       start_idx = (i * @order)
@@ -787,6 +810,14 @@ class Spline extends Curve
         unless p.enabled
           @segment[i].enabled = false;
           break
+
+  each_knot: ->
+    return unless @segment?
+    first = true
+    for s in @segment
+      for p from s.each_point(first)
+        yield p if p.knot
+      first = false
 
   each_point: ->
     return unless @segment?
@@ -852,6 +883,7 @@ class LERPingSplines
     @show_tooltips.checked = true    
 
     @option =
+      connect_cubic_control_points:    new UI.BoolOption('connect_cubic_control_points', true)
       show_ticks:                      new UI.BoolOption('show_ticks', false)
       show_pen_label:                  new UI.BoolOption('show_pen_label', true)
       show_algorithm:                  new UI.BoolOption('show_algorithm', true)
@@ -1209,11 +1241,22 @@ class LERPingSplines
     for p from @curve.each_point()
       oldx = p.x
       oldy = p.y
+      dx = mouse.x - oldx
+      dy = mouse.y - oldy
       if p.selected
         if (p.x != mouse.x) or (p.y != mouse.y)
           @point_has_changed = true
+
         p.x = mouse.x
         p.y = mouse.y
+
+        if @spline_mode && (@curve.order == 3) && APP.option.connect_cubic_control_points.get()
+          if p.prev
+            p.prev.x += dx
+            p.prev.y += dy
+          if p.next
+            p.next.x += dx
+            p.next.y += dy
 
       oldhover = p.hover
       if p.contains(mouse.x, mouse.y)

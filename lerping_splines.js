@@ -1432,7 +1432,7 @@ class Matrix {
     };
 
     Curve.prototype.draw = function() {
-      var l, len, len1, len2, len3, m, n, o, order, p, ref, ref1, ref2, results;
+      var l, len, len1, len2, len3, m, o, order, p, ref, ref1, ref2, results, u;
       if (!((this.points != null) && (this.points[0] != null))) {
         return;
       }
@@ -1447,14 +1447,14 @@ class Matrix {
         }
       }
       ref1 = this.points[1];
-      for (n = 0, len2 = ref1.length; n < len2; n++) {
-        p = ref1[n];
+      for (o = 0, len2 = ref1.length; o < len2; o++) {
+        p = ref1[o];
         p.draw();
       }
       ref2 = this.points[0];
       results = [];
-      for (o = 0, len3 = ref2.length; o < len3; o++) {
-        p = ref2[o];
+      for (u = 0, len3 = ref2.length; u < len3; u++) {
+        p = ref2[u];
         results.push(p.draw());
       }
       return results;
@@ -1758,7 +1758,7 @@ class Matrix {
       Spline.__super__.constructor.apply(this, arguments);
       this.segment_count = 0;
       this.segment = [];
-      this.order = 2;
+      this.order = 3;
     }
 
     Spline.prototype.log = function() {
@@ -1841,28 +1841,68 @@ class Matrix {
     };
 
     Spline.prototype.add_initial_points = function(initial_points) {
-      var cidx, i, index, j, l, label, len, m, margin, n, next, pidx, point, pos, prev, range, ref, ref1, x, y;
+      var i, l, margin, prev, range, ref, x, y;
       if (initial_points == null) {
         initial_points = this.constructor.initial_points;
       }
       margin = LERPingSplines.create_point_margin;
       range = 1.0 - (2.0 * margin);
       this.points[0] = [];
+      prev = null;
       for (i = l = 0, ref = this.max_points(); 0 <= ref ? l <= ref : l >= ref; i = 0 <= ref ? ++l : --l) {
         x = margin + (range * Math.random());
         y = margin + (range * Math.random());
         this.points[i] = new Point(x * APP.graph_width, y * APP.graph_height);
+        if (prev != null) {
+          prev.next = this.points[i];
+          this.points[i].prev = prev;
+        }
+        prev = this.points[i];
       }
-      for (index = m = 0, len = initial_points.length; m < len; index = ++m) {
+      this.rebuild_spline(initial_points);
+      this.log();
+      return console.log('Initial points & segments created!');
+    };
+
+    Spline.prototype.joining_points_for_order = function(order) {
+      var l, len, n, p, points, ref, results;
+      n = 0;
+      points = [];
+      ref = this.each_point();
+      results = [];
+      for (l = 0, len = ref.length; l < len; l++) {
+        p = ref[l];
+        if (n < 2) {
+          points.push(p.position);
+          n = order;
+        }
+        results.push(n--);
+      }
+      return results;
+    };
+
+    Spline.prototype.rebuild_spline = function(initial_points) {
+      var cidx, end_idx, i, index, j, l, label, len, m, margin, next, o, p, pidx, point, pos, prev, range, ref, ref1, results, seg_points, start_idx;
+      if (initial_points == null) {
+        initial_points = null;
+      }
+      margin = LERPingSplines.create_point_margin;
+      range = 1.0 - (2.0 * margin);
+      if (initial_points == null) {
+        initial_points = this.joining_points_for_order(this.order);
+        console.log('initial_points', initial_points);
+      }
+      for (index = l = 0, len = initial_points.length; l < len; index = ++l) {
         point = initial_points[index];
         pidx = index * this.order;
         this.points[pidx].enabled = true;
         this.points[pidx].x = (margin + (range * point[0])) * APP.graph_width;
         this.points[pidx].y = (margin + (range * point[1])) * APP.graph_height;
         this.points[pidx].set_label(LERPingSplines.point_labels[index]);
+        this.points[pidx].knot = true;
         this.segment_count += 1;
         if (index > 0) {
-          for (j = n = 1, ref1 = this.order - 1; 1 <= ref1 ? n <= ref1 : n >= ref1; j = 1 <= ref1 ? ++n : --n) {
+          for (j = m = 1, ref = this.order - 1; 1 <= ref ? m <= ref : m >= ref; j = 1 <= ref ? ++m : --m) {
             cidx = pidx - this.order + j;
             prev = this.points[pidx - this.order];
             next = this.points[pidx];
@@ -1873,18 +1913,12 @@ class Matrix {
             this.points[cidx].y = pos.y;
             label = "" + prev.label + next.label + j;
             this.points[cidx].set_label(label);
+            this.points[cidx].knot = false;
           }
         }
       }
-      this.rebuild_spline();
-      this.log();
-      return console.log('Initial points & segments created!');
-    };
-
-    Spline.prototype.rebuild_spline = function() {
-      var end_idx, i, l, p, ref, results, seg_points, start_idx;
       results = [];
-      for (i = l = 0, ref = this.max_segments(); 0 <= ref ? l <= ref : l >= ref; i = 0 <= ref ? ++l : --l) {
+      for (i = o = 0, ref1 = this.max_segments(); 0 <= ref1 ? o <= ref1 : o >= ref1; i = 0 <= ref1 ? ++o : --o) {
         start_idx = i * this.order;
         end_idx = start_idx + this.order + 1;
         if (end_idx >= this.current_max_points()) {
@@ -1896,10 +1930,10 @@ class Matrix {
         this.segment[i].set_points(seg_points);
         this.segment[i].enabled = true;
         results.push((function() {
-          var len, m, results1;
+          var len1, results1, u;
           results1 = [];
-          for (m = 0, len = seg_points.length; m < len; m++) {
-            p = seg_points[m];
+          for (u = 0, len1 = seg_points.length; u < len1; u++) {
+            p = seg_points[u];
             if (!p.enabled) {
               this.segment[i].enabled = false;
               break;
@@ -1909,6 +1943,27 @@ class Matrix {
           }
           return results1;
         }).call(this));
+      }
+      return results;
+    };
+
+    Spline.prototype.each_knot = function*() {
+      var first, l, len, p, ref, ref1, results, s;
+      if (this.segment == null) {
+        return;
+      }
+      first = true;
+      ref = this.segment;
+      results = [];
+      for (l = 0, len = ref.length; l < len; l++) {
+        s = ref[l];
+        ref1 = s.each_point(first);
+        for (p of ref1) {
+          if (p.knot) {
+            yield p;
+          }
+        }
+        results.push(first = false);
       }
       return results;
     };
@@ -2049,6 +2104,7 @@ class Matrix {
       this.show_tooltips.addEventListener('change', this.on_show_tooltips_change);
       this.show_tooltips.checked = true;
       this.option = {
+        connect_cubic_control_points: new UI.BoolOption('connect_cubic_control_points', true),
         show_ticks: new UI.BoolOption('show_ticks', false),
         show_pen_label: new UI.BoolOption('show_pen_label', true),
         show_algorithm: new UI.BoolOption('show_algorithm', true),
@@ -2466,19 +2522,31 @@ class Matrix {
     };
 
     LERPingSplines.prototype.on_mousemove_canvas = function(event) {
-      var mouse, oldhover, oldx, oldy, p, ref, results;
+      var dx, dy, mouse, oldhover, oldx, oldy, p, ref, results;
       mouse = this.get_mouse_coord(event);
       ref = this.curve.each_point();
       results = [];
       for (p of ref) {
         oldx = p.x;
         oldy = p.y;
+        dx = mouse.x - oldx;
+        dy = mouse.y - oldy;
         if (p.selected) {
           if ((p.x !== mouse.x) || (p.y !== mouse.y)) {
             this.point_has_changed = true;
           }
           p.x = mouse.x;
           p.y = mouse.y;
+          if (this.spline_mode && (this.curve.order === 3) && APP.option.connect_cubic_control_points.get()) {
+            if (p.prev) {
+              p.prev.x += dx;
+              p.prev.y += dy;
+            }
+            if (p.next) {
+              p.next.x += dx;
+              p.next.y += dy;
+            }
+          }
         }
         oldhover = p.hover;
         if (p.contains(mouse.x, mouse.y)) {
