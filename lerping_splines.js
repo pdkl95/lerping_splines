@@ -978,6 +978,7 @@ class Matrix {
       if (this.label_color == null) {
         this.label_color = '#000';
       }
+      this.show_label = true;
       this.position = {
         x: x,
         y: y
@@ -1013,6 +1014,30 @@ class Matrix {
       dy = this.y - y;
       dist = Math.sqrt((dx * dx) + (dy * dy));
       return dist <= this.radius + LERPingSplines.mouseover_point_radius_boost;
+    };
+
+    Point.prototype.mirror_around_prev_knot = function() {
+      var delta, newpos;
+      delta = Vec2.sub(this.prev, this.prev.prev);
+      newpos = Vec2.add(this.prev, delta);
+      this.x = newpos.x;
+      return this.y = newpos.y;
+    };
+
+    Point.prototype.mirror_around_next_knot = function() {
+      var delta, newpos;
+      delta = Vec2.sub(this.next, this.next.next);
+      newpos = Vec2.add(this.next, delta);
+      this.x = newpos.x;
+      return this.y = newpos.y;
+    };
+
+    Point.prototype.mirror_around_knot = function() {
+      if ((this.prev != null) && (this.prev.prev != null) && this.prev.knot) {
+        return this.mirror_around_prev_knot();
+      } else if ((this.next != null) && (this.next.next != null) && this.next.knot) {
+        return this.mirror_around_next_knot();
+      }
     };
 
     Point.prototype.update = function(t) {
@@ -1070,7 +1095,7 @@ class Matrix {
       ctx.arc(this.x, this.y, radius, 0, TAU);
       ctx.fillStyle = this.color;
       ctx.fill();
-      if (this.label) {
+      if (this.label && this.show_label) {
         ctx.fillStyle = this.label_color;
         return ctx.fillText(this.label, this.label_position.x, this.label_position.y);
       }
@@ -1149,11 +1174,6 @@ class Matrix {
       }
       ctx = APP.graph_ctx;
       draw_from_to_line = true;
-      if (APP.spline_mode) {
-        if (!(this.from.knot || this.to.knot)) {
-          draw_from_to_line = false;
-        }
-      }
       if (draw_from_to_line) {
         ctx.beginPath();
         ctx.strokeStyle = this.color;
@@ -1290,7 +1310,10 @@ class Matrix {
         this.enabled_points += 1;
       }
       this.points[0] = points;
+      this.first_point = this.points[0][0];
+      this.last_point = this.points[0][this.points[0].length - 1];
       this.add_lerps();
+      this.setup_label();
       return this.setup_pen();
     };
 
@@ -1329,23 +1352,15 @@ class Matrix {
     };
 
     Curve.prototype.setup_pen = function() {
-      var i, l, p, ref;
-      p = null;
-      for (i = l = ref = this.max_points() - 1; ref <= 1 ? l <= 1 : l >= 1; i = ref <= 1 ? ++l : --l) {
-        p = this.points[i][0];
-        if (p != null ? p.enabled : void 0) {
-          break;
-        }
-      }
-      if (p != null) {
-        this.pen = p;
-        return this.pen.update_order_0_point_label_color();
-      } else {
-        return APP.debug("ERROR: no pen?!");
-      }
+      return this.pen = this.find_pen();
+    };
+
+    Curve.prototype.setup_label = function() {
+      return this.label = this.first_point.label + "~" + this.last_point.label;
     };
 
     Curve.prototype.update_enabled_points = function() {
+      var i;
       if (this.ui_enabled) {
         if (this.enabled_points < this.max_points()) {
           APP.add_point_btn.disabled = false;
@@ -1360,6 +1375,13 @@ class Matrix {
         APP.num_points.textContent = "" + this.enabled_points;
       }
       this.update();
+      this.first_point = this.points[0][0];
+      i = this.points[0].length - 1;
+      while (i > 0 && !this.points[0][i].enabled) {
+        i--;
+      }
+      this.last_point = this.points[0][i];
+      this.setup_label();
       this.setup_pen();
       return APP.update_algorithm();
     };
@@ -1924,7 +1946,7 @@ class Matrix {
     };
 
     Spline.prototype.rebuild_spline = function(initial_points) {
-      var cidx, end_idx, i, index, j, l, len, len1, m, margin, next, o, p, pidx, point, pos, prev, range, ref, ref1, seg_points, start_idx, u;
+      var cidx, end_idx, i, index, j, l, label, len, len1, m, margin, next, o, p, pidx, point, pos, prev, range, ref, ref1, seg_points, start_idx, u;
       if (initial_points == null) {
         initial_points = null;
       }
@@ -1952,6 +1974,9 @@ class Matrix {
             this.points[cidx].enabled = true;
             this.points[cidx].x = pos.x;
             this.points[cidx].y = pos.y;
+            label = "" + prev.label + next.label + j;
+            this.points[cidx].set_label(label);
+            this.points[cidx].show_label = false;
             this.points[cidx].knot = false;
           }
         }
@@ -2053,13 +2078,15 @@ class Matrix {
 
     Spline.prototype.call_on_each_segment = function(func_name) {
       var l, len, ref, results, s;
+      s = this.current_segment();
+      if (s != null) {
+        this.pen = s.pen;
+      }
       ref = this.segment;
       results = [];
       for (l = 0, len = ref.length; l < len; l++) {
         s = ref[l];
         if (s != null ? s.enabled : void 0) {
-          s.pen = s.find_pen();
-          this.pen = s.pen;
           results.push(s[func_name]());
         } else {
           results.push(void 0);
@@ -2447,7 +2474,9 @@ class Matrix {
 
     LERPingSplines.prototype.on_btn_play_pause_click = function(event, ui) {
       if (this.running) {
-        return this.stop();
+        this.stop();
+        console.log(this.curve);
+        return console.log(this.curve.points);
       } else {
         return this.start();
       }
@@ -2618,11 +2647,9 @@ class Matrix {
               }
             } else {
               if ((p.prev != null) && (p.prev.prev != null) && p.prev.knot) {
-                p.prev.prev.x -= dx;
-                p.prev.prev.y -= dy;
+                p.prev.prev.mirror_around_next_knot();
               } else if ((p.next != null) && (p.next.next != null) && p.next.knot) {
-                p.next.next.x -= dx;
-                p.next.next.y -= dy;
+                p.next.next.mirror_around_prev_knot();
               }
             }
           }

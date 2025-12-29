@@ -13,6 +13,7 @@ class Point
     @radius = LERPingSplines.point_radius
     @color ?= '#000'
     @label_color ?= '#000'
+    @show_label = true
 
     @position =
       x: x
@@ -44,6 +45,25 @@ class Point
     dy = @y - y
     dist = Math.sqrt((dx * dx) + (dy * dy))
     return dist <= @radius + LERPingSplines.mouseover_point_radius_boost
+
+  mirror_around_prev_knot: ->
+    delta = Vec2.sub(@prev, @prev.prev)
+    newpos = Vec2.add(@prev, delta)
+    @x = newpos.x
+    @y = newpos.y
+
+  mirror_around_next_knot: ->
+    delta = Vec2.sub(@next, @next.next)
+    newpos = Vec2.add(@next, delta)
+    @x = newpos.x
+    @y = newpos.y
+
+
+  mirror_around_knot: ->
+    if @prev? and @prev.prev? and @prev.knot
+      @mirror_around_prev_knot()
+    else if @next? and @next.next? and @next.knot
+      @mirror_around_next_knot()
 
   update: (t) ->
     @position.x = @x
@@ -111,7 +131,7 @@ class Point
     ctx.fillStyle = @color
     ctx.fill()
 
-    if @label
+    if @label && @show_label
       ctx.fillStyle = @label_color
       ctx.fillText(@label, @label_position.x, @label_position.y);
 
@@ -175,9 +195,9 @@ class LERP extends Point
 
     draw_from_to_line = true
 
-    if APP.spline_mode
-      unless @from.knot or @to.knot
-        draw_from_to_line = false
+    # if APP.spline_mode
+    #   unless @from.knot or @to.knot
+    #     draw_from_to_line = false
 
     if draw_from_to_line
       ctx.beginPath()
@@ -271,7 +291,12 @@ class Curve
       @enabled_points += 1
 
     @points[0] = points
+
+    @first_point = @points[0][0]
+    @last_point = @points[0][ @points[0].length - 1 ]
+
     @add_lerps()
+    @setup_label()
     @setup_pen()
 
   add_initial_points: (initial_points = @constructor.initial_points) ->
@@ -301,16 +326,10 @@ class Curve
     return null
 
   setup_pen: ->
-    p = null
-    for i in [(@max_points() - 1)..1]
-      p = @points[i][0]
-      if p?.enabled
-        break
-    if p?
-      @pen = p
-      @pen.update_order_0_point_label_color()
-    else
-      APP.debug("ERROR: no pen?!")
+    @pen = @find_pen()
+
+  setup_label: ->
+    @label = "#{@first_point.label}~#{@last_point.label}"
 
   update_enabled_points: ->
     if @ui_enabled
@@ -327,6 +346,13 @@ class Curve
       APP.num_points.textContent = "#{@enabled_points}"
 
     @update()
+
+    @first_point = @points[0][0]
+    i = @points[0].length - 1
+    i-- while i > 0 and !@points[0][i].enabled
+    @last_point = @points[0][i]
+
+    @setup_label()
     @setup_pen()
     APP.update_algorithm()
 
@@ -812,8 +838,9 @@ class Spline extends Curve
           @points[cidx].enabled = true
           @points[cidx].x = pos.x
           @points[cidx].y = pos.y
-          #label = "#{prev.label}#{next.label}#{j}"
-          #@points[cidx].set_label( label )
+          label = "#{prev.label}#{next.label}#{j}"
+          @points[cidx].set_label( label )
+          @points[cidx].show_label = false
           #console.log("  cidx=#{cidx} label=\"#{label}\"")
           @points[cidx].knot = false
 
@@ -873,10 +900,11 @@ class Spline extends Curve
     return null
 
   call_on_each_segment: (func_name) ->
+    s = @current_segment()
+    @pen = s.pen if s?
+
     for s in @segment
       if s?.enabled
-        s.pen = s.find_pen()
-        @pen = s.pen
         s[func_name]()
 
   update: ->
@@ -1183,6 +1211,8 @@ class LERPingSplines
   on_btn_play_pause_click: (event, ui) =>
     if @running
       @stop()
+      console.log(@curve)
+      console.log(@curve.points)
     else
       @start()
 
@@ -1313,11 +1343,9 @@ class LERPingSplines
               p.next.y += dy
           else
             if p.prev? and p.prev.prev? and p.prev.knot
-              p.prev.prev.x -= dx
-              p.prev.prev.y -= dy
+              p.prev.prev.mirror_around_next_knot()
             else if p.next? and p.next.next? and p.next.knot
-              p.next.next.x -= dx
-              p.next.next.y -= dy
+              p.next.next.mirror_around_prev_knot()
 
       oldhover = p.hover
       if p.contains(mouse.x, mouse.y)
