@@ -1811,6 +1811,7 @@ class Matrix {
     Spline.initial_points = [[0.06, 0.82], [0.15, 0.08], [0.72, 0.18], [0.88, 0.90]];
 
     function Spline() {
+      this.update_at = bind(this.update_at, this);
       Spline.__super__.constructor.apply(this, arguments);
       this.segment_count = 0;
       this.segment = [];
@@ -2093,6 +2094,14 @@ class Matrix {
         }
       }
       return results;
+    };
+
+    Spline.prototype.update_at = function(t) {
+      var s;
+      s = this.current_segment();
+      if (s != null) {
+        return s.update_at(t);
+      }
     };
 
     Spline.prototype.update = function() {

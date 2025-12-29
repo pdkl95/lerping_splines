@@ -907,6 +907,11 @@ class Spline extends Curve
       if s?.enabled
         s[func_name]()
 
+  update_at: (t) =>
+    s = @current_segment()
+    if s?
+      s.update_at(t)
+
   update: ->
     @call_on_each_segment('update')
 
