@@ -88,1144 +88,6 @@
 
   })();
 
-  clone = function(obj) {
-    var flags, key, newInstance;
-    if ((obj == null) || typeof obj !== 'object') {
-      return obj;
-    }
-    if (obj instanceof Date) {
-      return new Date(obj.getTime());
-    }
-    if (obj instanceof RegExp) {
-      flags = '';
-      if (obj.global != null) {
-        flags += 'g';
-      }
-      if (obj.ignoreCase != null) {
-        flags += 'i';
-      }
-      if (obj.multiline != null) {
-        flags += 'm';
-      }
-      if (obj.sticky != null) {
-        flags += 'y';
-      }
-      return new RegExp(obj.source, flags);
-    }
-    newInstance = new obj.constructor();
-    for (key in obj) {
-      newInstance[key] = clone(obj[key]);
-    }
-    return newInstance;
-  };
-
-  Vec2 = (function() {
-    function Vec2() {}
-
-    Vec2.lerp = function(a, b, amount) {
-      return {
-        x: a.x + (amount * (b.x - a.x)),
-        y: a.y + (amount * (b.y - a.y))
-      };
-    };
-
-    Vec2.magnitude = function(v) {
-      return Math.sqrt((v.x * v.x) + (v.y * v.y));
-    };
-
-    Vec2.add = function(a, b) {
-      return {
-        x: a.x + b.x,
-        y: a.y + b.y
-      };
-    };
-
-    Vec2.sub = function(a, b) {
-      return {
-        x: a.x - b.x,
-        y: a.y - b.y
-      };
-    };
-
-    Vec2.scale = function(v, scale) {
-      return {
-        x: v.x * scale,
-        y: v.y * scale
-      };
-    };
-
-    Vec2.rotate = function(v, angle) {
-      var c, s;
-      c = Math.cos(angle);
-      s = Math.sin(angle);
-      return {
-        x: (v.x * c) - (v.y * s),
-        y: (v.x * s) + (v.y * c)
-      };
-    };
-
-    Vec2.normalize = function(v) {
-      var ilength, length, result;
-      result = {
-        x: 0.0,
-        y: 0.0
-      };
-      length = Math.sqrt((v.x * v.x) + (v.y * v.y));
-      if (length > 0) {
-        ilength = 1.0 / length;
-        result.x = v.x * ilength;
-        result.y = v.y * ilength;
-      }
-      return result;
-    };
-
-    return Vec2;
-
-  })();
-
-  
-/* copied from: https://raw.githubusercontent.com/Pomax/bezierinfo/refs/heads/master/js/graphics-element/api/types/matrix.js */
-
-function invert(M) {
-  // Copied from http://blog.acipo.com/matrix-inversion-in-javascript/
-  // With permission, http://blog.acipo.com/matrix-inversion-in-javascript/#comment-5057289889
-
-  // (1) 'augment' the matrix (left) by the identity (on the right)
-  // (2) Turn the matrix on the left into the identity by elemetry row ops
-  // (3) The matrix on the right is the inverse (was the identity matrix)
-  // There are 3 elemtary row ops:
-  // (a) Swap 2 rows
-  // (b) Multiply a row by a scalar
-  // (c) Add 2 rows
-
-  //if the matrix isn't square: exit (error)
-  if (M.length !== M[0].length) {
-    console.log("not square");
-    return;
-  }
-
-  //create the identity matrix (I), and a copy (C) of the original
-  var i = 0,
-    ii = 0,
-    j = 0,
-    dim = M.length,
-    e = 0,
-    t = 0;
-  var I = [],
-    C = [];
-  for (i = 0; i < dim; i += 1) {
-    // Create the row
-    I[I.length] = [];
-    C[C.length] = [];
-    for (j = 0; j < dim; j += 1) {
-      //if we're on the diagonal, put a 1 (for identity)
-      if (i == j) {
-        I[i][j] = 1;
-      } else {
-        I[i][j] = 0;
-      }
-
-      // Also, make the copy of the original
-      C[i][j] = M[i][j];
-    }
-  }
-
-  // Perform elementary row operations
-  for (i = 0; i < dim; i += 1) {
-    // get the element e on the diagonal
-    e = C[i][i];
-
-    // if we have a 0 on the diagonal (we'll need to swap with a lower row)
-    if (e == 0) {
-      //look through every row below the i'th row
-      for (ii = i + 1; ii < dim; ii += 1) {
-        //if the ii'th row has a non-0 in the i'th col
-        if (C[ii][i] != 0) {
-          //it would make the diagonal have a non-0 so swap it
-          for (j = 0; j < dim; j++) {
-            e = C[i][j]; //temp store i'th row
-            C[i][j] = C[ii][j]; //replace i'th row by ii'th
-            C[ii][j] = e; //repace ii'th by temp
-            e = I[i][j]; //temp store i'th row
-            I[i][j] = I[ii][j]; //replace i'th row by ii'th
-            I[ii][j] = e; //repace ii'th by temp
-          }
-          //don't bother checking other rows since we've swapped
-          break;
-        }
-      }
-      //get the new diagonal
-      e = C[i][i];
-      //if it's still 0, not invertable (error)
-      if (e == 0) {
-        return;
-      }
-    }
-
-    // Scale this row down by e (so we have a 1 on the diagonal)
-    for (j = 0; j < dim; j++) {
-      C[i][j] = C[i][j] / e; //apply to original matrix
-      I[i][j] = I[i][j] / e; //apply to identity
-    }
-
-    // Subtract this row (scaled appropriately for each row) from ALL of
-    // the other rows so that there will be 0's in this column in the
-    // rows above and below this one
-    for (ii = 0; ii < dim; ii++) {
-      // Only apply to other rows (we want a 1 on the diagonal)
-      if (ii == i) {
-        continue;
-      }
-
-      // We want to change this element to 0
-      e = C[ii][i];
-
-      // Subtract (the row above(or below) scaled by e) from (the
-      // current row) but start at the i'th column and assume all the
-      // stuff left of diagonal is 0 (which it should be if we made this
-      // algorithm correctly)
-      for (j = 0; j < dim; j++) {
-        C[ii][j] -= e * C[i][j]; //apply to original matrix
-        I[ii][j] -= e * I[i][j]; //apply to identity
-      }
-    }
-  }
-
-  //we've done all operations, C should be the identity
-  //matrix I should be the inverse:
-  return I;
-}
-
-function multiply(m1, m2) {
-  var M = [];
-  var m2t = transpose(m2);
-  m1.forEach((row, r) => {
-    M[r] = [];
-    m2t.forEach((col, c) => {
-      M[r][c] = row.map((v, i) => col[i] * v).reduce((a, v) => a + v, 0);
-    });
-  });
-  return M;
-}
-
-function transpose(M) {
-  return M[0].map((col, i) => M.map((row) => row[i]));
-}
-
-class Matrix {
-  constructor(n, m, data) {
-    data = n instanceof Array ? n : data;
-    this.data = data ?? [...new Array(n)].map((v) => [...new Array(m)].map((v) => 0));
-    this.rows = this.data.length;
-    this.cols = this.data[0].length;
-  }
-  setData(data) {
-    this.data = data;
-  }
-  get(i, j) {
-    return this.data[i][j];
-  }
-  set(i, j, value) {
-    this.data[i][j] = value;
-  }
-  row(i) {
-    return this.data[i];
-  }
-  col(j) {
-    var d = this.data,
-      col = [];
-    for (let r = 0, l = d.length; r < l; r++) {
-      col.push(d[r][j]);
-    }
-    return col;
-  }
-  multiply(other) {
-    return new Matrix(multiply(this.data, other.data));
-  }
-  invert() {
-    return new Matrix(invert(this.data));
-  }
-  transpose() {
-    return new Matrix(transpose(this.data));
-  }
-}
-
-/*export { Matrix };*/
-;
-
-  window.UI || (window.UI = {});
-
-  UI.Option = (function() {
-    Option.create_input_element = function(type, id) {
-      var el;
-      if (type == null) {
-        type = null;
-      }
-      if (id == null) {
-        id = null;
-      }
-      el = window.APP.context.createElement('input');
-      if (id != null) {
-        el.id = id;
-      }
-      if (type != null) {
-        el.type = type;
-      }
-      return el;
-    };
-
-    function Option(id1, default_value, callback) {
-      var stored_value;
-      this.id = id1;
-      if (default_value == null) {
-        default_value = null;
-      }
-      this.callback = callback != null ? callback : {};
-      this.on_input = bind(this.on_input, this);
-      this.on_change = bind(this.on_change, this);
-      if (this.id instanceof Element) {
-        this.id = this.el.id;
-      } else {
-        this.el = window.APP.context.getElementById(this.id);
-        if (this.el == null) {
-          console.log("ERROR - could not find element with id=\"" + this.id + "\"");
-        }
-      }
-      this.persist = true;
-      this.storage_id = "ui_option-" + this.id;
-      this.label_id = this.id + "_label";
-      this.label_el = window.APP.context.getElementById(this.label_id);
-      this.label_text_formater = this.default_label_text_formater;
-      if (default_value != null) {
-        this["default"] = default_value;
-      } else {
-        this["default"] = this.detect_default_value();
-      }
-      stored_value = APP.storage_get(this.storage_id);
-      if (stored_value != null) {
-        this.set(stored_value);
-      } else {
-        this.set(this["default"]);
-      }
-      this.setup_listeners();
-    }
-
-    Option.prototype.setup_listeners = function() {
-      this.el.addEventListener('change', this.on_change);
-      return this.el.addEventListener('input', this.on_input);
-    };
-
-    Option.prototype.detect_default_value = function() {
-      return this.get();
-    };
-
-    Option.prototype.reset = function() {
-      APP.storage_remove(this.storage_id);
-      return this.set(this["default"]);
-    };
-
-    Option.prototype.register_callback = function(opt) {
-      var func, key, name, ref, results;
-      if (opt == null) {
-        opt = {};
-      }
-      for (name in opt) {
-        func = opt[name];
-        this.callback[name] = func;
-      }
-      ref = this.callback;
-      results = [];
-      for (key in ref) {
-        func = ref[key];
-        if (func == null) {
-          results.push(delete this.callback[name]);
-        } else {
-          results.push(void 0);
-        }
-      }
-      return results;
-    };
-
-    Option.prototype.set_value = function(new_value) {
-      if (new_value == null) {
-        new_value = null;
-      }
-      if (new_value != null) {
-        this.value = new_value;
-      }
-      if (this.label_el != null) {
-        this.label_el.innerText = this.label_text();
-      }
-      if (this.persist) {
-        return APP.storage_set(this.storage_id, this.value, this["default"]);
-      }
-    };
-
-    Option.prototype.default_label_text_formater = function(value) {
-      return "" + value;
-    };
-
-    Option.prototype.label_text = function() {
-      return this.label_text_formater(this.value);
-    };
-
-    Option.prototype.set_label_text_formater = function(func) {
-      this.label_text_formater = func;
-      return this.set_value();
-    };
-
-    Option.prototype.on_change = function(event) {
-      var base;
-      this.set(this.get(event.target), false);
-      return typeof (base = this.callback).on_change === "function" ? base.on_change(this.value) : void 0;
-    };
-
-    Option.prototype.on_input = function(event) {
-      var base;
-      this.set(this.get(event.target), false);
-      return typeof (base = this.callback).on_input === "function" ? base.on_input(this.value) : void 0;
-    };
-
-    Option.prototype.enable = function() {
-      return this.el.disabled = false;
-    };
-
-    Option.prototype.disable = function() {
-      return this.el.disabled = true;
-    };
-
-    Option.prototype.destroy = function() {
-      if (this.el != null) {
-        this.el.remove();
-      }
-      return this.el = null;
-    };
-
-    return Option;
-
-  })();
-
-  UI.BoolOption = (function(superClass) {
-    extend(BoolOption, superClass);
-
-    BoolOption.create = function() {
-      var id1, opt, parent, rest;
-      parent = arguments[0], id1 = arguments[1], rest = 3 <= arguments.length ? slice.call(arguments, 2) : [];
-      this.id = id1;
-      opt = (function(func, args, ctor) {
-        ctor.prototype = func.prototype;
-        var child = new ctor, result = func.apply(child, args);
-        return Object(result) === result ? result : child;
-      })(UI.BoolOption, [UIOption.create_input_element('checkbox', this.id)].concat(slice.call(rest)), function(){});
-      parent.appendChild(opt.el);
-      return opt;
-    };
-
-    function BoolOption() {
-      var args, parent;
-      args = 1 <= arguments.length ? slice.call(arguments, 0) : [];
-      this.on_bool_option_state_off_click = bind(this.on_bool_option_state_off_click, this);
-      this.on_bool_option_state_on_click = bind(this.on_bool_option_state_on_click, this);
-      BoolOption.__super__.constructor.apply(this, args);
-      parent = this.el.parentElement;
-      this.on_el = window.APP.context.createElement('span');
-      this.on_el.id = this.id + "_on";
-      this.on_el.textContent = "On";
-      this.on_el.classList.add("bool_option_state");
-      this.on_el.classList.add("on");
-      this.on_el.addEventListener('click', this.on_bool_option_state_on_click);
-      parent.appendChild(this.on_el);
-      this.off_el = window.APP.context.createElement('span');
-      this.off_el.id = this.id + "_off";
-      this.off_el.textContent = "Off";
-      this.off_el.classList.add("bool_option_state");
-      this.off_el.classList.add("off");
-      this.off_el.addEventListener('click', this.on_bool_option_state_off_click);
-      parent.appendChild(this.off_el);
-      this.el.classList.add("hidden");
-      this.set(this.get());
-    }
-
-    BoolOption.prototype.on_bool_option_state_on_click = function() {
-      var base;
-      this.set(false);
-      return typeof (base = this.callback).on_change === "function" ? base.on_change(this.value) : void 0;
-    };
-
-    BoolOption.prototype.on_bool_option_state_off_click = function() {
-      var base;
-      this.set(true);
-      return typeof (base = this.callback).on_change === "function" ? base.on_change(this.value) : void 0;
-    };
-
-    BoolOption.prototype.get = function(element) {
-      if (element == null) {
-        element = this.el;
-      }
-      return element.checked;
-    };
-
-    BoolOption.prototype.set = function(bool_value, update_element) {
-      var base, base1, newvalue, oldvalue;
-      if (update_element == null) {
-        update_element = true;
-      }
-      oldvalue = this.value;
-      newvalue = (function() {
-        switch (bool_value) {
-          case 'true':
-            return true;
-          case 'false':
-            return false;
-          default:
-            return !!bool_value;
-        }
-      })();
-      if (update_element) {
-        this.el.checked = newvalue;
-      }
-      this.set_value(newvalue);
-      if (oldvalue !== newvalue) {
-        if (newvalue) {
-          return typeof (base = this.callback).on_true === "function" ? base.on_true() : void 0;
-        } else {
-          return typeof (base1 = this.callback).on_false === "function" ? base1.on_false() : void 0;
-        }
-      }
-    };
-
-    BoolOption.prototype.set_value = function(new_value) {
-      if (new_value == null) {
-        new_value = null;
-      }
-      BoolOption.__super__.set_value.call(this, new_value);
-      return this.update_on_off_classes();
-    };
-
-    BoolOption.prototype.update_on_off_classes = function() {
-      if (this.get()) {
-        if (this.on_el != null) {
-          this.on_el.classList.remove('hidden');
-        }
-        if (this.off_el != null) {
-          return this.off_el.classList.add('hidden');
-        }
-      } else {
-        if (this.on_el != null) {
-          this.on_el.classList.add('hidden');
-        }
-        if (this.off_el != null) {
-          return this.off_el.classList.remove('hidden');
-        }
-      }
-    };
-
-    return BoolOption;
-
-  })(UI.Option);
-
-  UI.IntOption = (function(superClass) {
-    extend(IntOption, superClass);
-
-    function IntOption() {
-      return IntOption.__super__.constructor.apply(this, arguments);
-    }
-
-    IntOption.create = function() {
-      var id1, opt, parent, rest;
-      parent = arguments[0], id1 = arguments[1], rest = 3 <= arguments.length ? slice.call(arguments, 2) : [];
-      this.id = id1;
-      opt = (function(func, args, ctor) {
-        ctor.prototype = func.prototype;
-        var child = new ctor, result = func.apply(child, args);
-        return Object(result) === result ? result : child;
-      })(UI.IntOption, [UIOption.create_input_element('number', this.id)].concat(slice.call(rest)), function(){});
-      parent.appendChild(opt.el);
-      return opt;
-    };
-
-    IntOption.prototype.get = function(element) {
-      if (element == null) {
-        element = this.el;
-      }
-      return parseInt(element.value);
-    };
-
-    IntOption.prototype.set = function(number_value, update_element) {
-      if (update_element == null) {
-        update_element = true;
-      }
-      this.set_value(parseInt(number_value));
-      if (update_element) {
-        return this.el.value = this.value;
-      }
-    };
-
-    return IntOption;
-
-  })(UI.Option);
-
-  UI.FloatOption = (function(superClass) {
-    extend(FloatOption, superClass);
-
-    function FloatOption() {
-      return FloatOption.__super__.constructor.apply(this, arguments);
-    }
-
-    FloatOption.create = function() {
-      var id1, opt, parent, rest;
-      parent = arguments[0], id1 = arguments[1], rest = 3 <= arguments.length ? slice.call(arguments, 2) : [];
-      this.id = id1;
-      opt = (function(func, args, ctor) {
-        ctor.prototype = func.prototype;
-        var child = new ctor, result = func.apply(child, args);
-        return Object(result) === result ? result : child;
-      })(UI.IntOption, [UIOption.create_input_element(null, this.id)].concat(slice.call(rest)), function(){});
-      parent.appendChild(opt.el);
-      return opt;
-    };
-
-    FloatOption.prototype.get = function(element) {
-      if (element == null) {
-        element = this.el;
-      }
-      return parseFloat(element.value);
-    };
-
-    FloatOption.prototype.set = function(number_value, update_element) {
-      if (update_element == null) {
-        update_element = true;
-      }
-      this.set_value(parseFloat(number_value));
-      if (update_element) {
-        return this.el.value = this.value;
-      }
-    };
-
-    return FloatOption;
-
-  })(UI.Option);
-
-  UI.PercentOption = (function(superClass) {
-    extend(PercentOption, superClass);
-
-    function PercentOption() {
-      return PercentOption.__super__.constructor.apply(this, arguments);
-    }
-
-    PercentOption.prototype.label_text = function() {
-      var perc;
-      perc = parseInt(this.value * 100);
-      return perc + "%";
-    };
-
-    return PercentOption;
-
-  })(UI.FloatOption);
-
-  UI.SelectOption = (function(superClass) {
-    extend(SelectOption, superClass);
-
-    function SelectOption() {
-      return SelectOption.__super__.constructor.apply(this, arguments);
-    }
-
-    SelectOption.prototype.setup_listeners = function() {
-      return this.el.addEventListener('change', this.on_change);
-    };
-
-    SelectOption.prototype.get = function(element) {
-      var opt;
-      if (element == null) {
-        element = this.el;
-      }
-      opt = element.options[element.selectedIndex];
-      if (opt != null) {
-        return opt.value;
-      } else {
-        return null;
-      }
-    };
-
-    SelectOption.prototype.set = function(option_name, update_element) {
-      var opt;
-      if (update_element == null) {
-        update_element = true;
-      }
-      opt = this.option_with_name(option_name);
-      if (opt != null) {
-        this.set_value(opt.value);
-        if (update_element) {
-          return opt.selected = true;
-        }
-      }
-    };
-
-    SelectOption.prototype.values = function() {
-      return this.el.options.map(function(x) {
-        return x.name;
-      });
-    };
-
-    SelectOption.prototype.option_with_name = function(name) {
-      var l, len, opt, ref;
-      ref = this.el.options;
-      for (l = 0, len = ref.length; l < len; l++) {
-        opt = ref[l];
-        if (opt.value === name) {
-          return opt;
-        }
-      }
-      return null;
-    };
-
-    SelectOption.prototype.add_option = function(value, text, selected) {
-      var opt;
-      if (selected == null) {
-        selected = false;
-      }
-      opt = document.createElement('option');
-      opt.value = value;
-      opt.text = text;
-      this.el.add(opt, null);
-      if (selected) {
-        opt.selected = true;
-      }
-      return this.set(this.get());
-    };
-
-    return SelectOption;
-
-  })(UI.Option);
-
-  UI.ChoiceOption = (function(superClass) {
-    extend(ChoiceOption, superClass);
-
-    function ChoiceOption(group_class, default_value, callback) {
-      var ref, stored_value;
-      this.group_class = group_class;
-      if (default_value == null) {
-        default_value = null;
-      }
-      this.callback = callback != null ? callback : {};
-      this.on_choice_click = bind(this.on_choice_click, this);
-      this.setup_choice = bind(this.setup_choice, this);
-      this.group_selector = "." + this.group_class;
-      this.el_list = window.APP.context.querySelectorAll(this.group_selector);
-      if (!(((ref = this.el_list) != null ? ref.length : void 0) > 0)) {
-        console.log("ERROR - could not find with class \"" + this.name + "\"");
-      }
-      this.persist = true;
-      this.storage_id = "ui_option-" + this.group_class;
-      this.el_list.forEach(this.setup_choice);
-      if (default_value != null) {
-        this["default"] = default_value;
-      } else {
-        this["default"] = this.detect_default_value();
-      }
-      stored_value = APP.storage_get(this.storage_id);
-      if (stored_value != null) {
-        this.set(stored_value);
-      } else {
-        this.set(this["default"]);
-      }
-    }
-
-    ChoiceOption.prototype.detect_default_value = function() {
-      return this.el_list[0].dataset.value;
-    };
-
-    ChoiceOption.prototype.setup_choice = function(el) {
-      return el.addEventListener('click', this.on_choice_click);
-    };
-
-    ChoiceOption.prototype.on_choice_click = function(event) {
-      return this.set(event.target.dataset.value);
-    };
-
-    ChoiceOption.prototype.setup_listeners = function() {};
-
-    ChoiceOption.prototype.set_value = function(new_value) {
-      var base, old_value;
-      if (new_value == null) {
-        new_value = null;
-      }
-      if (new_value != null) {
-        old_value = this.value;
-        this.value = new_value;
-        if (old_value !== new_value) {
-          if (typeof (base = this.callback).on_change === "function") {
-            base.on_change(this.value);
-          }
-        }
-      } else {
-        console.log("set_value(null) called for UI.ChoiceOption \"" + this.group_class + "\'");
-      }
-      if (this.persist) {
-        return APP.storage_set(this.storage_id, this.value, this["default"]);
-      }
-    };
-
-    ChoiceOption.prototype.get_element_with_value = function(value) {
-      var el, l, len, ref;
-      ref = this.el_list;
-      for (l = 0, len = ref.length; l < len; l++) {
-        el = ref[l];
-        if (el.dataset.value === value) {
-          return el;
-        }
-      }
-      return null;
-    };
-
-    ChoiceOption.prototype.clear_selected = function() {
-      var el, l, len, ref, results;
-      ref = this.el_list;
-      results = [];
-      for (l = 0, len = ref.length; l < len; l++) {
-        el = ref[l];
-        results.push(el.classList.remove('selected'));
-      }
-      return results;
-    };
-
-    ChoiceOption.prototype.get = function() {
-      return this.value;
-    };
-
-    ChoiceOption.prototype.set = function(new_value, update_element) {
-      var el;
-      if (update_element == null) {
-        update_element = true;
-      }
-      el = this.get_element_with_value(new_value);
-      if (el != null) {
-        this.set_value(new_value);
-        if (update_element) {
-          this.clear_selected();
-          return el.classList.add('selected');
-        }
-      } else {
-        return console.log("Invalid value \"" + new_value + "\" for UI.ChoiceOption \"" + this.group_class + "\'");
-      }
-    };
-
-    ChoiceOption.prototype.change = function() {
-      var base;
-      return typeof (base = this.callback).on_change === "function" ? base.on_change(this.value) : void 0;
-    };
-
-    ChoiceOption.prototype.enable = function() {
-      return this.el_list.forEach(function(el) {
-        return el.classList.remove('disabled');
-      });
-    };
-
-    ChoiceOption.prototype.disable = function() {
-      return this.el_list.forEach(function(el) {
-        return el.classList.add('disabled');
-      });
-    };
-
-    return ChoiceOption;
-
-  })(UI.Option);
-
-  UI.ColorOption = (function(superClass) {
-    extend(ColorOption, superClass);
-
-    function ColorOption() {
-      return ColorOption.__super__.constructor.apply(this, arguments);
-    }
-
-    ColorOption.prototype.get = function(element) {
-      if (element == null) {
-        element = this.el;
-      }
-      return element.value;
-    };
-
-    ColorOption.prototype.set = function(new_value, update_element) {
-      if (update_element == null) {
-        update_element = true;
-      }
-      this.set_value(new_value);
-      if (update_element) {
-        this.el.value = new_value;
-      }
-      return this.color;
-    };
-
-    return ColorOption;
-
-  })(UI.Option);
-
-  window.APP = null;
-
-  TAU = 2 * Math.PI;
-
-  Point = (function() {
-    function Point(x, y, color1) {
-      this.color = color1;
-      this.enabled = false;
-      this.hover = false;
-      this.selected = false;
-      this.order = 0;
-      this.radius = LERPingSplines.point_radius;
-      if (this.color == null) {
-        this.color = '#000';
-      }
-      if (this.label_color == null) {
-        this.label_color = '#000';
-      }
-      this.show_label = true;
-      this.position = {
-        x: x,
-        y: y
-      };
-      this.label_position = {
-        x: x,
-        y: y
-      };
-      this.move(x, y);
-    }
-
-    Point.prototype.set_label = function(label1) {
-      this.label = label1;
-      this.label_metrics = APP.graph_ctx.measureText(this.label);
-      this.label_width = this.label_metrics.width;
-      return this.label_height = LERPingSplines.point_label_height;
-    };
-
-    Point.prototype.get_label = function() {
-      return this.label;
-    };
-
-    Point.prototype.move = function(x, y) {
-      this.x = x;
-      this.y = y;
-      this.ix = Math.floor(this.x);
-      return this.iy = Math.floor(this.y);
-    };
-
-    Point.prototype.contains = function(x, y) {
-      var dist, dx, dy;
-      dx = this.x - x;
-      dy = this.y - y;
-      dist = Math.sqrt((dx * dx) + (dy * dy));
-      return dist <= this.radius + LERPingSplines.mouseover_point_radius_boost;
-    };
-
-    Point.prototype.mirror_around_prev_knot = function() {
-      var delta, newpos;
-      delta = Vec2.sub(this.prev, this.prev.prev);
-      newpos = Vec2.add(this.prev, delta);
-      this.x = newpos.x;
-      return this.y = newpos.y;
-    };
-
-    Point.prototype.mirror_around_next_knot = function() {
-      var delta, newpos;
-      delta = Vec2.sub(this.next, this.next.next);
-      newpos = Vec2.add(this.next, delta);
-      this.x = newpos.x;
-      return this.y = newpos.y;
-    };
-
-    Point.prototype.mirror_around_knot = function() {
-      if ((this.prev != null) && (this.prev.prev != null) && this.prev.knot) {
-        return this.mirror_around_prev_knot();
-      } else if ((this.next != null) && (this.next.next != null) && this.next.knot) {
-        return this.mirror_around_next_knot();
-      }
-    };
-
-    Point.prototype.update = function(t) {
-      this.position.x = this.x;
-      this.position.y = this.y;
-      this.x_is_left = true;
-      if ((this.position.x > (APP.graph_width / 2.0)) && (this.position.x < APP.point_label_flip_margin.max_x)) {
-        this.x_is_left = false;
-      }
-      if (this.position.x <= APP.point_label_flip_margin.min_x) {
-        this.x_is_left = false;
-      }
-      if (this.x_is_left) {
-        this.label_position.x = this.position.x - this.label_width - 13;
-      } else {
-        this.label_position.x = this.position.x + this.label_width - 1;
-      }
-      this.y_is_top = true;
-      if ((this.position.y > (APP.graph_height / 2.0)) && (this.position.y < APP.point_label_flip_margin.max_y)) {
-        this.y_is_top = false;
-      }
-      if (this.position.y <= APP.point_label_flip_margin.min_y) {
-        this.y_is_top = false;
-      }
-      if (this.y_is_top) {
-        return this.label_position.y = this.position.y - this.label_height + 2;
-      } else {
-        return this.label_position.y = this.position.y + this.label_height + 8;
-      }
-    };
-
-    Point.prototype.draw = function() {
-      var ctx, inner_radius, radius;
-      if (!this.enabled) {
-        return;
-      }
-      ctx = APP.graph_ctx;
-      radius = this.radius = 5;
-      inner_radius = radius * 0.8;
-      if (this.hover) {
-        ctx.beginPath();
-        ctx.fillStyle = '#ff0';
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 1;
-        ctx.arc(this.x, this.y, radius * 3, 0, TAU);
-        ctx.fill();
-        ctx.stroke();
-        radius *= 1.5;
-        inner_radius = this.radius * 0.7;
-      }
-      ctx.beginPath();
-      if (APP.spline_mode && !this.knot) {
-        ctx.arc(this.x, this.y, inner_radius, 0, TAU, true);
-      }
-      ctx.arc(this.x, this.y, radius, 0, TAU);
-      ctx.fillStyle = this.color;
-      ctx.fill();
-      if (this.label && this.show_label) {
-        ctx.fillStyle = this.label_color;
-        return ctx.fillText(this.label, this.label_position.x, this.label_position.y);
-      }
-    };
-
-    return Point;
-
-  })();
-
-  LERP = (function(superClass) {
-    extend(LERP, superClass);
-
-    function LERP(order1, from, to) {
-      this.order = order1;
-      this.from = from;
-      this.to = to;
-      this.enabled = false;
-      this.radius = 5;
-      this.color = (function() {
-        switch (this.order) {
-          case 1:
-            return '#451C92';
-          case 2:
-            return '#2D42DC';
-          case 3:
-            return '#A243DC';
-          case 4:
-            return '#D44143';
-          case 5:
-            return '#D98F46';
-          case 6:
-            return '#70D942';
-          case 7:
-            return '#6E55FF';
-          default:
-            return '#555';
-        }
-      }).call(this);
-      this.position = {
-        x: this.from.x,
-        y: this.from.y
-      };
-      this.prev_position = {
-        x: null,
-        y: null
-      };
-    }
-
-    LERP.prototype.generate_label = function(order, index) {
-      this.label = "" + this.from.label + this.to.label;
-      return this.alg_label = "temp_" + order + "_" + index;
-    };
-
-    LERP.prototype.get_label = function() {
-      if (APP.option.alt_algorithm_names.value) {
-        return this.label;
-      } else {
-        return this.alg_label;
-      }
-    };
-
-    LERP.prototype.interpolate = function(t, a, b) {
-      return (t * b) + ((1 - t) * a);
-    };
-
-    LERP.prototype.update = function(t) {
-      this.enabled = this.from.enabled && this.to.enabled;
-      this.position.x = this.interpolate(t, this.from.position.x, this.to.position.x);
-      return this.position.y = this.interpolate(t, this.from.position.y, this.to.position.y);
-    };
-
-    LERP.prototype.draw = function() {
-      var ctx, draw_from_to_line;
-      if (!this.enabled) {
-        return;
-      }
-      ctx = APP.graph_ctx;
-      draw_from_to_line = true;
-      if (draw_from_to_line) {
-        ctx.beginPath();
-        ctx.strokeStyle = this.color;
-        ctx.lineWidth = 1;
-        ctx.moveTo(this.from.position.x, this.from.position.y);
-        ctx.lineTo(this.to.position.x, this.to.position.y);
-        ctx.stroke();
-      }
-      ctx.beginPath();
-      if (APP.curve.pen === this) {
-        ctx.arc(this.position.x, this.position.y, this.radius + 3, 0, TAU);
-        ctx.fillStyle = this.color;
-        ctx.fill();
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.globalOpacity = 0.4;
-        ctx.stroke();
-        return ctx.globalOpacity = 1.0;
-      } else {
-        ctx.lineWidth = 3;
-        ctx.arc(this.position.x, this.position.y, this.radius + 1, 0, TAU);
-        return ctx.stroke();
-      }
-    };
-
-    LERP.prototype.update_order_0_point_label_color = function() {
-      var color, hsv, p, ref, results, rgb;
-      if (APP.curve == null) {
-        return;
-      }
-      rgb = Color.hex2rgb(this.color);
-      hsv = Color.rgb2hsv(rgb[0], rgb[1], rgb[2]);
-      hsv[0] += 0.7;
-      if (hsv[0] > 1.0) {
-        hsv[0] -= 1.0;
-      }
-      hsv[1] *= 0.5;
-      hsv[2] *= 0.55;
-      rgb = Color.hsv2rgb(hsv[0], hsv[1], hsv[2]);
-      color = Color.rgbarr2hex(rgb);
-      ref = APP.curve.each_point();
-      results = [];
-      for (p of ref) {
-        results.push(p.label_color = color);
-      }
-      return results;
-    };
-
-    return LERP;
-
-  })(Point);
-
   Curve = (function() {
     function Curve() {
       this.update_at = bind(this.update_at, this);
@@ -2136,6 +998,10 @@ class Matrix {
 
   })(Curve);
 
+  window.APP = null;
+
+  TAU = 2 * Math.PI;
+
   LERPingSplines = (function() {
     LERPingSplines.create_point_margin = 0.12;
 
@@ -2847,5 +1713,1139 @@ class Matrix {
       return window.APP.draw();
     };
   })(this));
+
+  clone = function(obj) {
+    var flags, key, newInstance;
+    if ((obj == null) || typeof obj !== 'object') {
+      return obj;
+    }
+    if (obj instanceof Date) {
+      return new Date(obj.getTime());
+    }
+    if (obj instanceof RegExp) {
+      flags = '';
+      if (obj.global != null) {
+        flags += 'g';
+      }
+      if (obj.ignoreCase != null) {
+        flags += 'i';
+      }
+      if (obj.multiline != null) {
+        flags += 'm';
+      }
+      if (obj.sticky != null) {
+        flags += 'y';
+      }
+      return new RegExp(obj.source, flags);
+    }
+    newInstance = new obj.constructor();
+    for (key in obj) {
+      newInstance[key] = clone(obj[key]);
+    }
+    return newInstance;
+  };
+
+  Vec2 = (function() {
+    function Vec2() {}
+
+    Vec2.lerp = function(a, b, amount) {
+      return {
+        x: a.x + (amount * (b.x - a.x)),
+        y: a.y + (amount * (b.y - a.y))
+      };
+    };
+
+    Vec2.magnitude = function(v) {
+      return Math.sqrt((v.x * v.x) + (v.y * v.y));
+    };
+
+    Vec2.add = function(a, b) {
+      return {
+        x: a.x + b.x,
+        y: a.y + b.y
+      };
+    };
+
+    Vec2.sub = function(a, b) {
+      return {
+        x: a.x - b.x,
+        y: a.y - b.y
+      };
+    };
+
+    Vec2.scale = function(v, scale) {
+      return {
+        x: v.x * scale,
+        y: v.y * scale
+      };
+    };
+
+    Vec2.rotate = function(v, angle) {
+      var c, s;
+      c = Math.cos(angle);
+      s = Math.sin(angle);
+      return {
+        x: (v.x * c) - (v.y * s),
+        y: (v.x * s) + (v.y * c)
+      };
+    };
+
+    Vec2.normalize = function(v) {
+      var ilength, length, result;
+      result = {
+        x: 0.0,
+        y: 0.0
+      };
+      length = Math.sqrt((v.x * v.x) + (v.y * v.y));
+      if (length > 0) {
+        ilength = 1.0 / length;
+        result.x = v.x * ilength;
+        result.y = v.y * ilength;
+      }
+      return result;
+    };
+
+    return Vec2;
+
+  })();
+
+  
+/* copied from: https://raw.githubusercontent.com/Pomax/bezierinfo/refs/heads/master/js/graphics-element/api/types/matrix.js */
+
+function invert(M) {
+  // Copied from http://blog.acipo.com/matrix-inversion-in-javascript/
+  // With permission, http://blog.acipo.com/matrix-inversion-in-javascript/#comment-5057289889
+
+  // (1) 'augment' the matrix (left) by the identity (on the right)
+  // (2) Turn the matrix on the left into the identity by elemetry row ops
+  // (3) The matrix on the right is the inverse (was the identity matrix)
+  // There are 3 elemtary row ops:
+  // (a) Swap 2 rows
+  // (b) Multiply a row by a scalar
+  // (c) Add 2 rows
+
+  //if the matrix isn't square: exit (error)
+  if (M.length !== M[0].length) {
+    console.log("not square");
+    return;
+  }
+
+  //create the identity matrix (I), and a copy (C) of the original
+  var i = 0,
+    ii = 0,
+    j = 0,
+    dim = M.length,
+    e = 0,
+    t = 0;
+  var I = [],
+    C = [];
+  for (i = 0; i < dim; i += 1) {
+    // Create the row
+    I[I.length] = [];
+    C[C.length] = [];
+    for (j = 0; j < dim; j += 1) {
+      //if we're on the diagonal, put a 1 (for identity)
+      if (i == j) {
+        I[i][j] = 1;
+      } else {
+        I[i][j] = 0;
+      }
+
+      // Also, make the copy of the original
+      C[i][j] = M[i][j];
+    }
+  }
+
+  // Perform elementary row operations
+  for (i = 0; i < dim; i += 1) {
+    // get the element e on the diagonal
+    e = C[i][i];
+
+    // if we have a 0 on the diagonal (we'll need to swap with a lower row)
+    if (e == 0) {
+      //look through every row below the i'th row
+      for (ii = i + 1; ii < dim; ii += 1) {
+        //if the ii'th row has a non-0 in the i'th col
+        if (C[ii][i] != 0) {
+          //it would make the diagonal have a non-0 so swap it
+          for (j = 0; j < dim; j++) {
+            e = C[i][j]; //temp store i'th row
+            C[i][j] = C[ii][j]; //replace i'th row by ii'th
+            C[ii][j] = e; //repace ii'th by temp
+            e = I[i][j]; //temp store i'th row
+            I[i][j] = I[ii][j]; //replace i'th row by ii'th
+            I[ii][j] = e; //repace ii'th by temp
+          }
+          //don't bother checking other rows since we've swapped
+          break;
+        }
+      }
+      //get the new diagonal
+      e = C[i][i];
+      //if it's still 0, not invertable (error)
+      if (e == 0) {
+        return;
+      }
+    }
+
+    // Scale this row down by e (so we have a 1 on the diagonal)
+    for (j = 0; j < dim; j++) {
+      C[i][j] = C[i][j] / e; //apply to original matrix
+      I[i][j] = I[i][j] / e; //apply to identity
+    }
+
+    // Subtract this row (scaled appropriately for each row) from ALL of
+    // the other rows so that there will be 0's in this column in the
+    // rows above and below this one
+    for (ii = 0; ii < dim; ii++) {
+      // Only apply to other rows (we want a 1 on the diagonal)
+      if (ii == i) {
+        continue;
+      }
+
+      // We want to change this element to 0
+      e = C[ii][i];
+
+      // Subtract (the row above(or below) scaled by e) from (the
+      // current row) but start at the i'th column and assume all the
+      // stuff left of diagonal is 0 (which it should be if we made this
+      // algorithm correctly)
+      for (j = 0; j < dim; j++) {
+        C[ii][j] -= e * C[i][j]; //apply to original matrix
+        I[ii][j] -= e * I[i][j]; //apply to identity
+      }
+    }
+  }
+
+  //we've done all operations, C should be the identity
+  //matrix I should be the inverse:
+  return I;
+}
+
+function multiply(m1, m2) {
+  var M = [];
+  var m2t = transpose(m2);
+  m1.forEach((row, r) => {
+    M[r] = [];
+    m2t.forEach((col, c) => {
+      M[r][c] = row.map((v, i) => col[i] * v).reduce((a, v) => a + v, 0);
+    });
+  });
+  return M;
+}
+
+function transpose(M) {
+  return M[0].map((col, i) => M.map((row) => row[i]));
+}
+
+class Matrix {
+  constructor(n, m, data) {
+    data = n instanceof Array ? n : data;
+    this.data = data ?? [...new Array(n)].map((v) => [...new Array(m)].map((v) => 0));
+    this.rows = this.data.length;
+    this.cols = this.data[0].length;
+  }
+  setData(data) {
+    this.data = data;
+  }
+  get(i, j) {
+    return this.data[i][j];
+  }
+  set(i, j, value) {
+    this.data[i][j] = value;
+  }
+  row(i) {
+    return this.data[i];
+  }
+  col(j) {
+    var d = this.data,
+      col = [];
+    for (let r = 0, l = d.length; r < l; r++) {
+      col.push(d[r][j]);
+    }
+    return col;
+  }
+  multiply(other) {
+    return new Matrix(multiply(this.data, other.data));
+  }
+  invert() {
+    return new Matrix(invert(this.data));
+  }
+  transpose() {
+    return new Matrix(transpose(this.data));
+  }
+}
+
+/*export { Matrix };*/
+;
+
+  Point = (function() {
+    function Point(x, y, color1) {
+      this.color = color1;
+      this.enabled = false;
+      this.hover = false;
+      this.selected = false;
+      this.order = 0;
+      this.radius = LERPingSplines.point_radius;
+      if (this.color == null) {
+        this.color = '#000';
+      }
+      if (this.label_color == null) {
+        this.label_color = '#000';
+      }
+      this.show_label = true;
+      this.position = {
+        x: x,
+        y: y
+      };
+      this.label_position = {
+        x: x,
+        y: y
+      };
+      this.move(x, y);
+    }
+
+    Point.prototype.set_label = function(label1) {
+      this.label = label1;
+      this.label_metrics = APP.graph_ctx.measureText(this.label);
+      this.label_width = this.label_metrics.width;
+      return this.label_height = LERPingSplines.point_label_height;
+    };
+
+    Point.prototype.get_label = function() {
+      return this.label;
+    };
+
+    Point.prototype.move = function(x, y) {
+      this.x = x;
+      this.y = y;
+      this.ix = Math.floor(this.x);
+      return this.iy = Math.floor(this.y);
+    };
+
+    Point.prototype.contains = function(x, y) {
+      var dist, dx, dy;
+      dx = this.x - x;
+      dy = this.y - y;
+      dist = Math.sqrt((dx * dx) + (dy * dy));
+      return dist <= this.radius + LERPingSplines.mouseover_point_radius_boost;
+    };
+
+    Point.prototype.mirror_around_prev_knot = function() {
+      var delta, newpos;
+      delta = Vec2.sub(this.prev, this.prev.prev);
+      newpos = Vec2.add(this.prev, delta);
+      this.x = newpos.x;
+      return this.y = newpos.y;
+    };
+
+    Point.prototype.mirror_around_next_knot = function() {
+      var delta, newpos;
+      delta = Vec2.sub(this.next, this.next.next);
+      newpos = Vec2.add(this.next, delta);
+      this.x = newpos.x;
+      return this.y = newpos.y;
+    };
+
+    Point.prototype.mirror_around_knot = function() {
+      if ((this.prev != null) && (this.prev.prev != null) && this.prev.knot) {
+        return this.mirror_around_prev_knot();
+      } else if ((this.next != null) && (this.next.next != null) && this.next.knot) {
+        return this.mirror_around_next_knot();
+      }
+    };
+
+    Point.prototype.update = function(t) {
+      this.position.x = this.x;
+      this.position.y = this.y;
+      this.x_is_left = true;
+      if ((this.position.x > (APP.graph_width / 2.0)) && (this.position.x < APP.point_label_flip_margin.max_x)) {
+        this.x_is_left = false;
+      }
+      if (this.position.x <= APP.point_label_flip_margin.min_x) {
+        this.x_is_left = false;
+      }
+      if (this.x_is_left) {
+        this.label_position.x = this.position.x - this.label_width - 13;
+      } else {
+        this.label_position.x = this.position.x + this.label_width - 1;
+      }
+      this.y_is_top = true;
+      if ((this.position.y > (APP.graph_height / 2.0)) && (this.position.y < APP.point_label_flip_margin.max_y)) {
+        this.y_is_top = false;
+      }
+      if (this.position.y <= APP.point_label_flip_margin.min_y) {
+        this.y_is_top = false;
+      }
+      if (this.y_is_top) {
+        return this.label_position.y = this.position.y - this.label_height + 2;
+      } else {
+        return this.label_position.y = this.position.y + this.label_height + 8;
+      }
+    };
+
+    Point.prototype.draw = function() {
+      var ctx, inner_radius, radius;
+      if (!this.enabled) {
+        return;
+      }
+      ctx = APP.graph_ctx;
+      radius = this.radius = 5;
+      inner_radius = radius * 0.8;
+      if (this.hover) {
+        ctx.beginPath();
+        ctx.fillStyle = '#ff0';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1;
+        ctx.arc(this.x, this.y, radius * 3, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+        radius *= 1.5;
+        inner_radius = this.radius * 0.7;
+      }
+      ctx.beginPath();
+      if (APP.spline_mode && !this.knot) {
+        ctx.arc(this.x, this.y, inner_radius, 0, TAU, true);
+      }
+      ctx.arc(this.x, this.y, radius, 0, TAU);
+      ctx.fillStyle = this.color;
+      ctx.fill();
+      if (this.label && this.show_label) {
+        ctx.fillStyle = this.label_color;
+        return ctx.fillText(this.label, this.label_position.x, this.label_position.y);
+      }
+    };
+
+    return Point;
+
+  })();
+
+  LERP = (function(superClass) {
+    extend(LERP, superClass);
+
+    function LERP(order1, from, to) {
+      this.order = order1;
+      this.from = from;
+      this.to = to;
+      this.enabled = false;
+      this.radius = 5;
+      this.color = (function() {
+        switch (this.order) {
+          case 1:
+            return '#451C92';
+          case 2:
+            return '#2D42DC';
+          case 3:
+            return '#A243DC';
+          case 4:
+            return '#D44143';
+          case 5:
+            return '#D98F46';
+          case 6:
+            return '#70D942';
+          case 7:
+            return '#6E55FF';
+          default:
+            return '#555';
+        }
+      }).call(this);
+      this.position = {
+        x: this.from.x,
+        y: this.from.y
+      };
+      this.prev_position = {
+        x: null,
+        y: null
+      };
+    }
+
+    LERP.prototype.generate_label = function(order, index) {
+      this.label = "" + this.from.label + this.to.label;
+      return this.alg_label = "temp_" + order + "_" + index;
+    };
+
+    LERP.prototype.get_label = function() {
+      if (APP.option.alt_algorithm_names.value) {
+        return this.label;
+      } else {
+        return this.alg_label;
+      }
+    };
+
+    LERP.prototype.interpolate = function(t, a, b) {
+      return (t * b) + ((1 - t) * a);
+    };
+
+    LERP.prototype.update = function(t) {
+      this.enabled = this.from.enabled && this.to.enabled;
+      this.position.x = this.interpolate(t, this.from.position.x, this.to.position.x);
+      return this.position.y = this.interpolate(t, this.from.position.y, this.to.position.y);
+    };
+
+    LERP.prototype.draw = function() {
+      var ctx, draw_from_to_line;
+      if (!this.enabled) {
+        return;
+      }
+      ctx = APP.graph_ctx;
+      draw_from_to_line = true;
+      if (draw_from_to_line) {
+        ctx.beginPath();
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 1;
+        ctx.moveTo(this.from.position.x, this.from.position.y);
+        ctx.lineTo(this.to.position.x, this.to.position.y);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      if (APP.curve.pen === this) {
+        ctx.arc(this.position.x, this.position.y, this.radius + 3, 0, TAU);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.globalOpacity = 0.4;
+        ctx.stroke();
+        return ctx.globalOpacity = 1.0;
+      } else {
+        ctx.lineWidth = 3;
+        ctx.arc(this.position.x, this.position.y, this.radius + 1, 0, TAU);
+        return ctx.stroke();
+      }
+    };
+
+    LERP.prototype.update_order_0_point_label_color = function() {
+      var color, hsv, p, ref, results, rgb;
+      if (APP.curve == null) {
+        return;
+      }
+      rgb = Color.hex2rgb(this.color);
+      hsv = Color.rgb2hsv(rgb[0], rgb[1], rgb[2]);
+      hsv[0] += 0.7;
+      if (hsv[0] > 1.0) {
+        hsv[0] -= 1.0;
+      }
+      hsv[1] *= 0.5;
+      hsv[2] *= 0.55;
+      rgb = Color.hsv2rgb(hsv[0], hsv[1], hsv[2]);
+      color = Color.rgbarr2hex(rgb);
+      ref = APP.curve.each_point();
+      results = [];
+      for (p of ref) {
+        results.push(p.label_color = color);
+      }
+      return results;
+    };
+
+    return LERP;
+
+  })(Point);
+
+  window.UI || (window.UI = {});
+
+  UI.Option = (function() {
+    Option.create_input_element = function(type, id) {
+      var el;
+      if (type == null) {
+        type = null;
+      }
+      if (id == null) {
+        id = null;
+      }
+      el = window.APP.context.createElement('input');
+      if (id != null) {
+        el.id = id;
+      }
+      if (type != null) {
+        el.type = type;
+      }
+      return el;
+    };
+
+    function Option(id1, default_value, callback) {
+      var stored_value;
+      this.id = id1;
+      if (default_value == null) {
+        default_value = null;
+      }
+      this.callback = callback != null ? callback : {};
+      this.on_input = bind(this.on_input, this);
+      this.on_change = bind(this.on_change, this);
+      if (this.id instanceof Element) {
+        this.id = this.el.id;
+      } else {
+        this.el = window.APP.context.getElementById(this.id);
+        if (this.el == null) {
+          console.log("ERROR - could not find element with id=\"" + this.id + "\"");
+        }
+      }
+      this.persist = true;
+      this.storage_id = "ui_option-" + this.id;
+      this.label_id = this.id + "_label";
+      this.label_el = window.APP.context.getElementById(this.label_id);
+      this.label_text_formater = this.default_label_text_formater;
+      if (default_value != null) {
+        this["default"] = default_value;
+      } else {
+        this["default"] = this.detect_default_value();
+      }
+      stored_value = APP.storage_get(this.storage_id);
+      if (stored_value != null) {
+        this.set(stored_value);
+      } else {
+        this.set(this["default"]);
+      }
+      this.setup_listeners();
+    }
+
+    Option.prototype.setup_listeners = function() {
+      this.el.addEventListener('change', this.on_change);
+      return this.el.addEventListener('input', this.on_input);
+    };
+
+    Option.prototype.detect_default_value = function() {
+      return this.get();
+    };
+
+    Option.prototype.reset = function() {
+      APP.storage_remove(this.storage_id);
+      return this.set(this["default"]);
+    };
+
+    Option.prototype.register_callback = function(opt) {
+      var func, key, name, ref, results;
+      if (opt == null) {
+        opt = {};
+      }
+      for (name in opt) {
+        func = opt[name];
+        this.callback[name] = func;
+      }
+      ref = this.callback;
+      results = [];
+      for (key in ref) {
+        func = ref[key];
+        if (func == null) {
+          results.push(delete this.callback[name]);
+        } else {
+          results.push(void 0);
+        }
+      }
+      return results;
+    };
+
+    Option.prototype.set_value = function(new_value) {
+      if (new_value == null) {
+        new_value = null;
+      }
+      if (new_value != null) {
+        this.value = new_value;
+      }
+      if (this.label_el != null) {
+        this.label_el.innerText = this.label_text();
+      }
+      if (this.persist) {
+        return APP.storage_set(this.storage_id, this.value, this["default"]);
+      }
+    };
+
+    Option.prototype.default_label_text_formater = function(value) {
+      return "" + value;
+    };
+
+    Option.prototype.label_text = function() {
+      return this.label_text_formater(this.value);
+    };
+
+    Option.prototype.set_label_text_formater = function(func) {
+      this.label_text_formater = func;
+      return this.set_value();
+    };
+
+    Option.prototype.on_change = function(event) {
+      var base;
+      this.set(this.get(event.target), false);
+      return typeof (base = this.callback).on_change === "function" ? base.on_change(this.value) : void 0;
+    };
+
+    Option.prototype.on_input = function(event) {
+      var base;
+      this.set(this.get(event.target), false);
+      return typeof (base = this.callback).on_input === "function" ? base.on_input(this.value) : void 0;
+    };
+
+    Option.prototype.enable = function() {
+      return this.el.disabled = false;
+    };
+
+    Option.prototype.disable = function() {
+      return this.el.disabled = true;
+    };
+
+    Option.prototype.destroy = function() {
+      if (this.el != null) {
+        this.el.remove();
+      }
+      return this.el = null;
+    };
+
+    return Option;
+
+  })();
+
+  UI.BoolOption = (function(superClass) {
+    extend(BoolOption, superClass);
+
+    BoolOption.create = function() {
+      var id1, opt, parent, rest;
+      parent = arguments[0], id1 = arguments[1], rest = 3 <= arguments.length ? slice.call(arguments, 2) : [];
+      this.id = id1;
+      opt = (function(func, args, ctor) {
+        ctor.prototype = func.prototype;
+        var child = new ctor, result = func.apply(child, args);
+        return Object(result) === result ? result : child;
+      })(UI.BoolOption, [UIOption.create_input_element('checkbox', this.id)].concat(slice.call(rest)), function(){});
+      parent.appendChild(opt.el);
+      return opt;
+    };
+
+    function BoolOption() {
+      var args, parent;
+      args = 1 <= arguments.length ? slice.call(arguments, 0) : [];
+      this.on_bool_option_state_off_click = bind(this.on_bool_option_state_off_click, this);
+      this.on_bool_option_state_on_click = bind(this.on_bool_option_state_on_click, this);
+      BoolOption.__super__.constructor.apply(this, args);
+      parent = this.el.parentElement;
+      this.on_el = window.APP.context.createElement('span');
+      this.on_el.id = this.id + "_on";
+      this.on_el.textContent = "On";
+      this.on_el.classList.add("bool_option_state");
+      this.on_el.classList.add("on");
+      this.on_el.addEventListener('click', this.on_bool_option_state_on_click);
+      parent.appendChild(this.on_el);
+      this.off_el = window.APP.context.createElement('span');
+      this.off_el.id = this.id + "_off";
+      this.off_el.textContent = "Off";
+      this.off_el.classList.add("bool_option_state");
+      this.off_el.classList.add("off");
+      this.off_el.addEventListener('click', this.on_bool_option_state_off_click);
+      parent.appendChild(this.off_el);
+      this.el.classList.add("hidden");
+      this.set(this.get());
+    }
+
+    BoolOption.prototype.on_bool_option_state_on_click = function() {
+      var base;
+      this.set(false);
+      return typeof (base = this.callback).on_change === "function" ? base.on_change(this.value) : void 0;
+    };
+
+    BoolOption.prototype.on_bool_option_state_off_click = function() {
+      var base;
+      this.set(true);
+      return typeof (base = this.callback).on_change === "function" ? base.on_change(this.value) : void 0;
+    };
+
+    BoolOption.prototype.get = function(element) {
+      if (element == null) {
+        element = this.el;
+      }
+      return element.checked;
+    };
+
+    BoolOption.prototype.set = function(bool_value, update_element) {
+      var base, base1, newvalue, oldvalue;
+      if (update_element == null) {
+        update_element = true;
+      }
+      oldvalue = this.value;
+      newvalue = (function() {
+        switch (bool_value) {
+          case 'true':
+            return true;
+          case 'false':
+            return false;
+          default:
+            return !!bool_value;
+        }
+      })();
+      if (update_element) {
+        this.el.checked = newvalue;
+      }
+      this.set_value(newvalue);
+      if (oldvalue !== newvalue) {
+        if (newvalue) {
+          return typeof (base = this.callback).on_true === "function" ? base.on_true() : void 0;
+        } else {
+          return typeof (base1 = this.callback).on_false === "function" ? base1.on_false() : void 0;
+        }
+      }
+    };
+
+    BoolOption.prototype.set_value = function(new_value) {
+      if (new_value == null) {
+        new_value = null;
+      }
+      BoolOption.__super__.set_value.call(this, new_value);
+      return this.update_on_off_classes();
+    };
+
+    BoolOption.prototype.update_on_off_classes = function() {
+      if (this.get()) {
+        if (this.on_el != null) {
+          this.on_el.classList.remove('hidden');
+        }
+        if (this.off_el != null) {
+          return this.off_el.classList.add('hidden');
+        }
+      } else {
+        if (this.on_el != null) {
+          this.on_el.classList.add('hidden');
+        }
+        if (this.off_el != null) {
+          return this.off_el.classList.remove('hidden');
+        }
+      }
+    };
+
+    return BoolOption;
+
+  })(UI.Option);
+
+  UI.IntOption = (function(superClass) {
+    extend(IntOption, superClass);
+
+    function IntOption() {
+      return IntOption.__super__.constructor.apply(this, arguments);
+    }
+
+    IntOption.create = function() {
+      var id1, opt, parent, rest;
+      parent = arguments[0], id1 = arguments[1], rest = 3 <= arguments.length ? slice.call(arguments, 2) : [];
+      this.id = id1;
+      opt = (function(func, args, ctor) {
+        ctor.prototype = func.prototype;
+        var child = new ctor, result = func.apply(child, args);
+        return Object(result) === result ? result : child;
+      })(UI.IntOption, [UIOption.create_input_element('number', this.id)].concat(slice.call(rest)), function(){});
+      parent.appendChild(opt.el);
+      return opt;
+    };
+
+    IntOption.prototype.get = function(element) {
+      if (element == null) {
+        element = this.el;
+      }
+      return parseInt(element.value);
+    };
+
+    IntOption.prototype.set = function(number_value, update_element) {
+      if (update_element == null) {
+        update_element = true;
+      }
+      this.set_value(parseInt(number_value));
+      if (update_element) {
+        return this.el.value = this.value;
+      }
+    };
+
+    return IntOption;
+
+  })(UI.Option);
+
+  UI.FloatOption = (function(superClass) {
+    extend(FloatOption, superClass);
+
+    function FloatOption() {
+      return FloatOption.__super__.constructor.apply(this, arguments);
+    }
+
+    FloatOption.create = function() {
+      var id1, opt, parent, rest;
+      parent = arguments[0], id1 = arguments[1], rest = 3 <= arguments.length ? slice.call(arguments, 2) : [];
+      this.id = id1;
+      opt = (function(func, args, ctor) {
+        ctor.prototype = func.prototype;
+        var child = new ctor, result = func.apply(child, args);
+        return Object(result) === result ? result : child;
+      })(UI.IntOption, [UIOption.create_input_element(null, this.id)].concat(slice.call(rest)), function(){});
+      parent.appendChild(opt.el);
+      return opt;
+    };
+
+    FloatOption.prototype.get = function(element) {
+      if (element == null) {
+        element = this.el;
+      }
+      return parseFloat(element.value);
+    };
+
+    FloatOption.prototype.set = function(number_value, update_element) {
+      if (update_element == null) {
+        update_element = true;
+      }
+      this.set_value(parseFloat(number_value));
+      if (update_element) {
+        return this.el.value = this.value;
+      }
+    };
+
+    return FloatOption;
+
+  })(UI.Option);
+
+  UI.PercentOption = (function(superClass) {
+    extend(PercentOption, superClass);
+
+    function PercentOption() {
+      return PercentOption.__super__.constructor.apply(this, arguments);
+    }
+
+    PercentOption.prototype.label_text = function() {
+      var perc;
+      perc = parseInt(this.value * 100);
+      return perc + "%";
+    };
+
+    return PercentOption;
+
+  })(UI.FloatOption);
+
+  UI.SelectOption = (function(superClass) {
+    extend(SelectOption, superClass);
+
+    function SelectOption() {
+      return SelectOption.__super__.constructor.apply(this, arguments);
+    }
+
+    SelectOption.prototype.setup_listeners = function() {
+      return this.el.addEventListener('change', this.on_change);
+    };
+
+    SelectOption.prototype.get = function(element) {
+      var opt;
+      if (element == null) {
+        element = this.el;
+      }
+      opt = element.options[element.selectedIndex];
+      if (opt != null) {
+        return opt.value;
+      } else {
+        return null;
+      }
+    };
+
+    SelectOption.prototype.set = function(option_name, update_element) {
+      var opt;
+      if (update_element == null) {
+        update_element = true;
+      }
+      opt = this.option_with_name(option_name);
+      if (opt != null) {
+        this.set_value(opt.value);
+        if (update_element) {
+          return opt.selected = true;
+        }
+      }
+    };
+
+    SelectOption.prototype.values = function() {
+      return this.el.options.map(function(x) {
+        return x.name;
+      });
+    };
+
+    SelectOption.prototype.option_with_name = function(name) {
+      var l, len, opt, ref;
+      ref = this.el.options;
+      for (l = 0, len = ref.length; l < len; l++) {
+        opt = ref[l];
+        if (opt.value === name) {
+          return opt;
+        }
+      }
+      return null;
+    };
+
+    SelectOption.prototype.add_option = function(value, text, selected) {
+      var opt;
+      if (selected == null) {
+        selected = false;
+      }
+      opt = document.createElement('option');
+      opt.value = value;
+      opt.text = text;
+      this.el.add(opt, null);
+      if (selected) {
+        opt.selected = true;
+      }
+      return this.set(this.get());
+    };
+
+    return SelectOption;
+
+  })(UI.Option);
+
+  UI.ChoiceOption = (function(superClass) {
+    extend(ChoiceOption, superClass);
+
+    function ChoiceOption(group_class, default_value, callback) {
+      var ref, stored_value;
+      this.group_class = group_class;
+      if (default_value == null) {
+        default_value = null;
+      }
+      this.callback = callback != null ? callback : {};
+      this.on_choice_click = bind(this.on_choice_click, this);
+      this.setup_choice = bind(this.setup_choice, this);
+      this.group_selector = "." + this.group_class;
+      this.el_list = window.APP.context.querySelectorAll(this.group_selector);
+      if (!(((ref = this.el_list) != null ? ref.length : void 0) > 0)) {
+        console.log("ERROR - could not find with class \"" + this.name + "\"");
+      }
+      this.persist = true;
+      this.storage_id = "ui_option-" + this.group_class;
+      this.el_list.forEach(this.setup_choice);
+      if (default_value != null) {
+        this["default"] = default_value;
+      } else {
+        this["default"] = this.detect_default_value();
+      }
+      stored_value = APP.storage_get(this.storage_id);
+      if (stored_value != null) {
+        this.set(stored_value);
+      } else {
+        this.set(this["default"]);
+      }
+    }
+
+    ChoiceOption.prototype.detect_default_value = function() {
+      return this.el_list[0].dataset.value;
+    };
+
+    ChoiceOption.prototype.setup_choice = function(el) {
+      return el.addEventListener('click', this.on_choice_click);
+    };
+
+    ChoiceOption.prototype.on_choice_click = function(event) {
+      return this.set(event.target.dataset.value);
+    };
+
+    ChoiceOption.prototype.setup_listeners = function() {};
+
+    ChoiceOption.prototype.set_value = function(new_value) {
+      var base, old_value;
+      if (new_value == null) {
+        new_value = null;
+      }
+      if (new_value != null) {
+        old_value = this.value;
+        this.value = new_value;
+        if (old_value !== new_value) {
+          if (typeof (base = this.callback).on_change === "function") {
+            base.on_change(this.value);
+          }
+        }
+      } else {
+        console.log("set_value(null) called for UI.ChoiceOption \"" + this.group_class + "\'");
+      }
+      if (this.persist) {
+        return APP.storage_set(this.storage_id, this.value, this["default"]);
+      }
+    };
+
+    ChoiceOption.prototype.get_element_with_value = function(value) {
+      var el, l, len, ref;
+      ref = this.el_list;
+      for (l = 0, len = ref.length; l < len; l++) {
+        el = ref[l];
+        if (el.dataset.value === value) {
+          return el;
+        }
+      }
+      return null;
+    };
+
+    ChoiceOption.prototype.clear_selected = function() {
+      var el, l, len, ref, results;
+      ref = this.el_list;
+      results = [];
+      for (l = 0, len = ref.length; l < len; l++) {
+        el = ref[l];
+        results.push(el.classList.remove('selected'));
+      }
+      return results;
+    };
+
+    ChoiceOption.prototype.get = function() {
+      return this.value;
+    };
+
+    ChoiceOption.prototype.set = function(new_value, update_element) {
+      var el;
+      if (update_element == null) {
+        update_element = true;
+      }
+      el = this.get_element_with_value(new_value);
+      if (el != null) {
+        this.set_value(new_value);
+        if (update_element) {
+          this.clear_selected();
+          return el.classList.add('selected');
+        }
+      } else {
+        return console.log("Invalid value \"" + new_value + "\" for UI.ChoiceOption \"" + this.group_class + "\'");
+      }
+    };
+
+    ChoiceOption.prototype.change = function() {
+      var base;
+      return typeof (base = this.callback).on_change === "function" ? base.on_change(this.value) : void 0;
+    };
+
+    ChoiceOption.prototype.enable = function() {
+      return this.el_list.forEach(function(el) {
+        return el.classList.remove('disabled');
+      });
+    };
+
+    ChoiceOption.prototype.disable = function() {
+      return this.el_list.forEach(function(el) {
+        return el.classList.add('disabled');
+      });
+    };
+
+    return ChoiceOption;
+
+  })(UI.Option);
+
+  UI.ColorOption = (function(superClass) {
+    extend(ColorOption, superClass);
+
+    function ColorOption() {
+      return ColorOption.__super__.constructor.apply(this, arguments);
+    }
+
+    ColorOption.prototype.get = function(element) {
+      if (element == null) {
+        element = this.el;
+      }
+      return element.value;
+    };
+
+    ColorOption.prototype.set = function(new_value, update_element) {
+      if (update_element == null) {
+        update_element = true;
+      }
+      this.set_value(new_value);
+      if (update_element) {
+        this.el.value = new_value;
+      }
+      return this.color;
+    };
+
+    return ColorOption;
+
+  })(UI.Option);
 
 }).call(this);

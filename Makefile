@@ -15,11 +15,13 @@ RM ?= rm -f
 # build deps
 #
 
-PROJECT_COFFEE_SRC = \
-	color.coffee \
-	math.coffee  \
-	uioption.coffee \
-	main.coffee
+PROJECT_COFFEE_SRC =         \
+	src/color.coffee     \
+	src/curve.coffee     \
+	src/main.coffee      \
+	src/math.coffee      \
+	src/point.coffee     \
+	src/uioption.coffee
 
 JS_TARGETS = $(PROJECT).js
 
