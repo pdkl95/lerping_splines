@@ -1064,6 +1064,10 @@ class LERPingSplines
 
     @reset_loop()
 
+    @shift = false
+
+    @context.addEventListener('keydown',   @on_keydown)
+    @context.addEventListener('keyup',     @on_keyup)
     @context.addEventListener('mousemove', @on_mousemove)
     @context.addEventListener('mousedown', @on_mousedown)
     @context.addEventListener('mouseup',   @on_mouseup)
@@ -1342,10 +1346,11 @@ class LERPingSplines
               p.next.x += dx
               p.next.y += dy
           else
-            if p.prev? and p.prev.prev? and p.prev.knot
-              p.prev.prev.mirror_around_next_knot()
-            else if p.next? and p.next.next? and p.next.knot
-              p.next.next.mirror_around_prev_knot()
+            unless @shift
+              if p.prev? and p.prev.prev? and p.prev.knot
+                p.prev.prev.mirror_around_next_knot()
+              else if p.next? and p.next.next? and p.next.knot
+                p.next.next.mirror_around_prev_knot()
 
       oldhover = p.hover
       if p.contains(mouse.x, mouse.y)
@@ -1393,6 +1398,14 @@ class LERPingSplines
       @on_mouseup_tslider(event)
     else
       @on_mouseup_canvas(event)
+
+  on_keydown: (event) =>
+    switch event.key
+      when "Shift" then @shift = true
+
+  on_keyup: (event) =>
+    switch event.key
+      when "Shift" then @shift = false
 
   draw: =>
     @curve.draw()

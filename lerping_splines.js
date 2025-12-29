@@ -2156,6 +2156,8 @@ class Matrix {
       this.update_at = bind(this.update_at, this);
       this.redraw_ui = bind(this.redraw_ui, this);
       this.draw = bind(this.draw, this);
+      this.on_keyup = bind(this.on_keyup, this);
+      this.on_keydown = bind(this.on_keydown, this);
       this.on_mouseup = bind(this.on_mouseup, this);
       this.on_mouseup_canvas = bind(this.on_mouseup_canvas, this);
       this.on_mouseup_tslider = bind(this.on_mouseup_tslider, this);
@@ -2285,6 +2287,9 @@ class Matrix {
       this.spline_curve.add_initial_points();
       this.option.mode.change();
       this.reset_loop();
+      this.shift = false;
+      this.context.addEventListener('keydown', this.on_keydown);
+      this.context.addEventListener('keyup', this.on_keyup);
       this.context.addEventListener('mousemove', this.on_mousemove);
       this.context.addEventListener('mousedown', this.on_mousedown);
       this.context.addEventListener('mouseup', this.on_mouseup);
@@ -2646,10 +2651,12 @@ class Matrix {
                 p.next.y += dy;
               }
             } else {
-              if ((p.prev != null) && (p.prev.prev != null) && p.prev.knot) {
-                p.prev.prev.mirror_around_next_knot();
-              } else if ((p.next != null) && (p.next.next != null) && p.next.knot) {
-                p.next.next.mirror_around_prev_knot();
+              if (!this.shift) {
+                if ((p.prev != null) && (p.prev.prev != null) && p.prev.knot) {
+                  p.prev.prev.mirror_around_next_knot();
+                } else if ((p.next != null) && (p.next.next != null) && p.next.knot) {
+                  p.next.next.mirror_around_prev_knot();
+                }
               }
             }
           }
@@ -2720,6 +2727,20 @@ class Matrix {
         return this.on_mouseup_tslider(event);
       } else {
         return this.on_mouseup_canvas(event);
+      }
+    };
+
+    LERPingSplines.prototype.on_keydown = function(event) {
+      switch (event.key) {
+        case "Shift":
+          return this.shift = true;
+      }
+    };
+
+    LERPingSplines.prototype.on_keyup = function(event) {
+      switch (event.key) {
+        case "Shift":
+          return this.shift = false;
       }
     };
 
