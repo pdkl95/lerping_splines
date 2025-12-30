@@ -131,7 +131,7 @@ class LERPingSplines
     @sub_order_btn = @find_element('sub_order')
     @sub_order_btn?.addEventListener('click', @on_sub_order_btn_click)
 
-    @num_segment = @find_element('num_segment')
+    @num_segments = @find_element('num_segments')
 
     @segment_wrapper = @find_element('segment_wrapper')
 

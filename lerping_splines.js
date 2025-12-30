@@ -516,6 +516,22 @@
       return 1.0;
     };
 
+    Bezier.prototype.add_order = function() {
+      return APP.assert_never_reached();
+    };
+
+    Bezier.prototype.sub_order = function() {
+      return APP.assert_never_reached();
+    };
+
+    Bezier.prototype.add_segment = function() {
+      return APP.assert_never_reached();
+    };
+
+    Bezier.prototype.sub_segment = function() {
+      return APP.assert_never_reached();
+    };
+
     Bezier.prototype.order_up_rebalance = function() {
       var cur, cur_id, k, prev, prev_id, results, x, y;
       cur_id = this.enabled_points;
@@ -738,24 +754,57 @@
       return this.constructor.max_order;
     };
 
+    Spline.prototype.update_order = function() {
+      if (this.ui_enabled) {
+        this.rebuild_spline();
+        if (this.order < this.max_order()) {
+          APP.add_order_btn.disabled = false;
+        } else {
+          APP.add_order_btn.disabled = true;
+        }
+        if (this.order > this.min_order()) {
+          APP.sub_order_btn.disabled = false;
+        } else {
+          APP.sub_order_btn.disabled = true;
+        }
+        return APP.num_order.textContent = "" + this.order;
+      }
+    };
+
     Spline.prototype.add_order = function() {
       if (this.order < this.max_order) {
         this.order += 1;
-        return this.rebuild_spline();
+        return this.update_order();
       }
     };
 
     Spline.prototype.sub_order = function() {
       if (this.order > this.min_order) {
         this.order -= 1;
-        return this.rebuild_spline();
+        return this.update_order();
+      }
+    };
+
+    Spline.prototype.update_enabled_segments = function() {
+      if (this.ui_enabled) {
+        if (this.enabled_segments < this.max_segments()) {
+          APP.add_segment_btn.disabled = false;
+        } else {
+          APP.add_segment_btn.disabled = true;
+        }
+        if (this.enabled_segments > this.min_segments()) {
+          APP.sub_segment_btn.disabled = false;
+        } else {
+          APP.sub_segment_btn.disabled = true;
+        }
+        return APP.num_segments.textContent = "" + this.enabled_segments;
       }
     };
 
     Spline.prototype.add_segment = function() {
       if (this.segment_count < this.max_segments()) {
         this.segment_count += 1;
-        return this.rebuild_spline();
+        return this.update_enabled_segments();
       }
     };
 
@@ -763,7 +812,7 @@
       if (this.segment_count > this.min_segments()) {
         this.segment_count -= 1;
         this.segment[this.segment_count].enabled = false;
-        return this.rebuild_spline();
+        return this.update_enabled_segments();
       }
     };
 
@@ -795,6 +844,8 @@
         prev = this.points[i];
       }
       this.rebuild_spline(initial_points);
+      this.update_order();
+      this.update_enabled_segments();
       this.log();
       return console.log('Initial points & segments created!');
     };
@@ -852,6 +903,7 @@
           }
         }
       }
+      this.enabled_segments = 0;
       for (i = o = 0, ref1 = this.max_segments(); 0 <= ref1 ? o <= ref1 : o >= ref1; i = 0 <= ref1 ? ++o : --o) {
         start_idx = i * this.order;
         end_idx = start_idx + this.order + 1;
@@ -870,7 +922,11 @@
             break;
           }
         }
+        if (this.segment[i].enabled) {
+          this.enabled_segments += 1;
+        }
       }
+      APP.num_segments;
       return this.mirror_knot_neighbors();
     };
 
@@ -1167,7 +1223,7 @@
       if ((ref3 = this.sub_order_btn) != null) {
         ref3.addEventListener('click', this.on_sub_order_btn_click);
       }
-      this.num_segment = this.find_element('num_segment');
+      this.num_segments = this.find_element('num_segments');
       this.segment_wrapper = this.find_element('segment_wrapper');
       this.add_segment_btn = this.find_element('add_segment');
       if ((ref4 = this.add_segment_btn) != null) {

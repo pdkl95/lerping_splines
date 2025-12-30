@@ -349,6 +349,18 @@ class Bezier extends Curve
   t_max: ->
     1.0
 
+  add_order: ->
+    APP.assert_never_reached()
+
+  sub_order: ->
+    APP.assert_never_reached()
+
+  add_segment: ->
+    APP.assert_never_reached()
+
+  sub_segment: ->
+    APP.assert_never_reached()
+
   order_up_rebalance: ->
     cur_id = @enabled_points
     prev_id = cur_id - 1
@@ -542,26 +554,59 @@ class Spline extends Curve
   max_order: ->
     @constructor.max_order
 
+  update_order: ->
+    #@rebuild_spline()
+
+    if @ui_enabled
+      @rebuild_spline()
+      if @order < @max_order()
+        APP.add_order_btn.disabled = false
+      else
+        APP.add_order_btn.disabled = true
+
+      if @order > @min_order()
+        APP.sub_order_btn.disabled = false
+      else
+        APP.sub_order_btn.disabled = true
+
+      APP.num_order.textContent = "#{@order}"
+
   add_order: ->
     if @order < @max_order
       @order += 1
-      @rebuild_spline()
+      @update_order()
 
   sub_order: ->
     if @order > @min_order
       @order -= 1
-      @rebuild_spline()
+      @update_order()
+
+  update_enabled_segments: ->
+    #@rebuild_spline()
+
+    if @ui_enabled
+      if @enabled_segments < @max_segments()
+        APP.add_segment_btn.disabled = false
+      else
+        APP.add_segment_btn.disabled = true
+
+      if @enabled_segments > @min_segments()
+        APP.sub_segment_btn.disabled = false
+      else
+        APP.sub_segment_btn.disabled = true
+
+      APP.num_segments.textContent = "#{@enabled_segments}"
 
   add_segment: ->
     if @segment_count < @max_segments()
       @segment_count += 1
-      @rebuild_spline()
+      @update_enabled_segments()
 
   sub_segment: ->
     if @segment_count > @min_segments()
       @segment_count -= 1
       @segment[@segment_count].enabled = false
-      @rebuild_spline()
+      @update_enabled_segments()
 
   enable_point: (rebalance_points) ->
     APP.assert_never_reached()
@@ -586,6 +631,8 @@ class Spline extends Curve
 
     #@log()
     @rebuild_spline(initial_points)
+    @update_order()
+    @update_enabled_segments()
     @log()
 
     console.log('Initial points & segments created!')
@@ -633,6 +680,7 @@ class Spline extends Curve
           @points[cidx].knot = false
 
     #console.log("rebuilding spline with up to #{@max_segments()} segmente")
+    @enabled_segments = 0
     for i in [0..@max_segments()]
       start_idx = (i * @order)
       end_idx = start_idx + @order + 1
@@ -649,6 +697,10 @@ class Spline extends Curve
           @segment[i].enabled = false;
           break
 
+      if @segment[i].enabled
+        @enabled_segments += 1
+
+    APP.num_segments
     @mirror_knot_neighbors()
 
   mirror_knot_neighbors: ->
