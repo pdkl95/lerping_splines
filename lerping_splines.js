@@ -767,6 +767,14 @@
       }
     };
 
+    Spline.prototype.enable_point = function(rebalance_points) {
+      return APP.assert_never_reached();
+    };
+
+    Spline.prototype.disable_point = function(rebalance_points) {
+      return APP.assert_never_reached();
+    };
+
     Spline.prototype.add_initial_points = function(initial_points) {
       var i, l, margin, prev, range, ref, x, y;
       if (initial_points == null) {
@@ -1049,6 +1057,8 @@
       this.on_tslide_btn_min_click = bind(this.on_tslide_btn_min_click, this);
       this.on_tslider_bg_click = bind(this.on_tslider_bg_click, this);
       this.on_btn_play_pause_click = bind(this.on_btn_play_pause_click, this);
+      this.on_sub_segment_btn_click = bind(this.on_sub_segment_btn_click, this);
+      this.on_add_segment_btn_click = bind(this.on_add_segment_btn_click, this);
       this.on_sub_order_btn_click = bind(this.on_sub_order_btn_click, this);
       this.on_add_order_btn_click = bind(this.on_add_order_btn_click, this);
       this.on_remove_point_btn_click = bind(this.on_remove_point_btn_click, this);
@@ -1061,7 +1071,7 @@
     }
 
     LERPingSplines.prototype.init = function() {
-      var ref, ref1, ref2, ref3;
+      var ref, ref1, ref2, ref3, ref4, ref5;
       console.log('Starting init()...');
       this.running = false;
       this.content_el = this.context.getElementById('content');
@@ -1138,6 +1148,7 @@
       this.btn_play_pause = this.find_element('button_play_pause');
       this.btn_play_pause.addEventListener('click', this.on_btn_play_pause_click);
       this.num_points = this.find_element('num_points');
+      this.points_wrapper = this.find_element('points_wrapper');
       this.add_point_btn = this.find_element('add_point');
       if ((ref = this.add_point_btn) != null) {
         ref.addEventListener('click', this.on_add_point_btn_click);
@@ -1155,6 +1166,16 @@
       this.sub_order_btn = this.find_element('sub_order');
       if ((ref3 = this.sub_order_btn) != null) {
         ref3.addEventListener('click', this.on_sub_order_btn_click);
+      }
+      this.num_segment = this.find_element('num_segment');
+      this.segment_wrapper = this.find_element('segment_wrapper');
+      this.add_segment_btn = this.find_element('add_segment');
+      if ((ref4 = this.add_segment_btn) != null) {
+        ref4.addEventListener('click', this.on_add_segment_btn_click);
+      }
+      this.sub_segment_btn = this.find_element('sub_segment');
+      if ((ref5 = this.sub_segment_btn) != null) {
+        ref5.addEventListener('click', this.on_sub_segment_btn_click);
       }
       this.algorithmbox = this.find_element('algorithmbox');
       this.algorithm_text = this.find_element('algorithm_text');
@@ -1201,6 +1222,10 @@
       this.runhing = false;
       msg = "FATAL ERROR: " + msg;
       return this.debug(msg);
+    };
+
+    LERPingSplines.prototype.assert_never_reached = function() {
+      return this.fatal_error("assert_never_reached() was reached");
     };
 
     LERPingSplines.prototype.create_element = function(tag_name, opt) {
@@ -1279,6 +1304,8 @@
       this.spline_mode = false;
       this.curve = this.bezier_curve;
       this.order_wrapper.classList.add('hidden');
+      this.segment_wrapper.classList.add('hidden');
+      this.points_wrapper.classList.remove('hidden');
       return this.update_and_draw();
     };
 
@@ -1288,6 +1315,8 @@
       this.spline_mode = true;
       this.curve = this.spline_curve;
       this.order_wrapper.classList.remove('hidden');
+      this.segment_wrapper.classList.remove('hidden');
+      this.points_wrapper.classList.add('hidden');
       return this.update_and_draw();
     };
 
@@ -1349,6 +1378,16 @@
 
     LERPingSplines.prototype.on_sub_order_btn_click = function(event, ui) {
       this.curve.sub_order();
+      return this.update_and_draw();
+    };
+
+    LERPingSplines.prototype.on_add_segment_btn_click = function(event, ui) {
+      this.curve.add_segment();
+      return this.update_and_draw();
+    };
+
+    LERPingSplines.prototype.on_sub_segment_btn_click = function(event, ui) {
+      this.curve.sub_segment();
       return this.update_and_draw();
     };
 

@@ -113,6 +113,8 @@ class LERPingSplines
 
     @num_points = @find_element('num_points')
  
+    @points_wrapper = @find_element('points_wrapper')
+
     @add_point_btn = @find_element('add_point')
     @add_point_btn?.addEventListener('click', @on_add_point_btn_click)
 
@@ -128,6 +130,16 @@ class LERPingSplines
 
     @sub_order_btn = @find_element('sub_order')
     @sub_order_btn?.addEventListener('click', @on_sub_order_btn_click)
+
+    @num_segment = @find_element('num_segment')
+
+    @segment_wrapper = @find_element('segment_wrapper')
+
+    @add_segment_btn = @find_element('add_segment')
+    @add_segment_btn?.addEventListener('click', @on_add_segment_btn_click)
+
+    @sub_segment_btn = @find_element('sub_segment')
+    @sub_segment_btn?.addEventListener('click', @on_sub_segment_btn_click)
 
     @algorithmbox   = @find_element('algorithmbox')
     @algorithm_text = @find_element('algorithm_text')
@@ -180,6 +192,9 @@ class LERPingSplines
     msg = "FATAL ERROR: #{msg}"
     @debug(msg)
 
+  assert_never_reached: ->
+    @fatal_error("assert_never_reached() was reached")
+
   create_element: (tag_name, opt = {}) ->
     el = @context.createElement(tag_name)
     if opt['class']?
@@ -231,6 +246,8 @@ class LERPingSplines
     @curve = @bezier_curve
 
     @order_wrapper.classList.add('hidden')
+    @segment_wrapper.classList.add('hidden')
+    @points_wrapper.classList.remove('hidden')
 
     @update_and_draw()
 
@@ -241,6 +258,8 @@ class LERPingSplines
     @curve = @spline_curve
 
     @order_wrapper.classList.remove('hidden')
+    @segment_wrapper.classList.remove('hidden')
+    @points_wrapper.classList.add('hidden')
 
     @update_and_draw()
 
@@ -285,6 +304,14 @@ class LERPingSplines
 
   on_sub_order_btn_click: (event, ui) =>
     @curve.sub_order()
+    @update_and_draw()
+
+  on_add_segment_btn_click: (event, ui) =>
+    @curve.add_segment()
+    @update_and_draw()
+
+  on_sub_segment_btn_click: (event, ui) =>
+    @curve.sub_segment()
     @update_and_draw()
 
   on_btn_play_pause_click: (event, ui) =>

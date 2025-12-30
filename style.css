@@ -299,7 +299,8 @@ button[disabled] {
 }
 
 #num_points,
-#num_order {
+#num_order,
+#num_segment {
   font-size: 16px;
   cursor: auto;
   padding-top: 3px;

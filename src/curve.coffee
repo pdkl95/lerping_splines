@@ -563,6 +563,12 @@ class Spline extends Curve
       @segment[@segment_count].enabled = false
       @rebuild_spline()
 
+  enable_point: (rebalance_points) ->
+    APP.assert_never_reached()
+
+  disable_point: (rebalance_points) ->
+    APP.assert_never_reached()
+
   add_initial_points: (initial_points = @constructor.initial_points) ->
     margin = LERPingSplines.create_point_margin
     range = 1.0 - (2.0 * margin)
