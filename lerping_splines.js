@@ -105,6 +105,10 @@
       this.pen_label_offset_length = Vec2.magnitude(this.pen_label_offset);
     }
 
+    Curve.prototype.reset = function() {
+      return this.reset_points();
+    };
+
     Curve.prototype.disable_ui = function() {
       return this.ui_enabled = false;
     };
@@ -179,27 +183,14 @@
       return this.setup_pen();
     };
 
-    Curve.prototype.add_initial_points = function(initial_points) {
-      var i, l, len, m, margin, point, range, ref, x, y;
-      if (initial_points == null) {
-        initial_points = this.constructor.initial_points;
+    Curve.prototype.reset_points = function() {
+      var p, ref, results;
+      ref = this.each_point();
+      results = [];
+      for (p of ref) {
+        results.push(p.reset());
       }
-      margin = LERPingSplines.create_point_margin;
-      range = 1.0 - (2.0 * margin);
-      this.points[0] = [];
-      for (i = l = 0, ref = this.max_points(); 0 <= ref ? l <= ref : l >= ref; i = 0 <= ref ? ++l : --l) {
-        x = margin + (range * Math.random());
-        y = margin + (range * Math.random());
-        this.points[0][i] = new Point(x * APP.graph_width, y * APP.graph_height);
-        this.points[0][i].set_label(LERPingSplines.point_labels[i]);
-      }
-      this.add_lerps();
-      for (m = 0, len = initial_points.length; m < len; m++) {
-        point = initial_points[m];
-        this.enable_point_at(point[0], point[1]);
-      }
-      this.update_enabled_points();
-      return console.log('Initial points created!');
+      return results;
     };
 
     Curve.prototype.find_point = function(x, y) {
@@ -256,7 +247,7 @@
         return;
       }
       p = this.points[0][this.enabled_points];
-      if (rebalance_points && APP.option.rebalance_points_on_order_up.value) {
+      if (rebalance_points && APP.option.rebalance_points_on_order_up.value && APP.bezier_mode) {
         this.order_up_rebalance();
       }
       p.enabled = true;
@@ -280,7 +271,7 @@
       if (this.enabled_points <= this.min_points()) {
         return;
       }
-      if (this.enabled_points > 3 && APP.option.rebalance_points_on_order_down.value) {
+      if (this.enabled_points > 3 && APP.option.rebalance_points_on_order_down.value && APP.bezier_mode) {
         this.compute_lower_order_curve();
       }
       this.enabled_points -= 1;
@@ -498,15 +489,16 @@
   Bezier = (function(superClass) {
     extend(Bezier, superClass);
 
-    function Bezier() {
-      return Bezier.__super__.constructor.apply(this, arguments);
-    }
-
     Bezier.min_points = 3;
 
     Bezier.max_points = 8;
 
     Bezier.initial_points = [[0.06, 0.82], [0.72, 0.18]];
+
+    function Bezier() {
+      Bezier.__super__.constructor.apply(this, arguments);
+      this.alloc_points();
+    }
 
     Bezier.prototype.t_min = function() {
       return 0.0;
@@ -516,20 +508,37 @@
       return 1.0;
     };
 
-    Bezier.prototype.add_order = function() {
-      return APP.assert_never_reached();
-    };
-
-    Bezier.prototype.sub_order = function() {
-      return APP.assert_never_reached();
-    };
-
     Bezier.prototype.add_segment = function() {
       return APP.assert_never_reached();
     };
 
     Bezier.prototype.sub_segment = function() {
       return APP.assert_never_reached();
+    };
+
+    Bezier.prototype.alloc_points = function() {
+      var i, l, ref;
+      this.points[0] = [];
+      for (i = l = 0, ref = this.max_points(); 0 <= ref ? l <= ref : l >= ref; i = 0 <= ref ? ++l : --l) {
+        this.points[0][i] = new Point();
+        this.points[0][i].set_label(LERPingSplines.point_labels[i]);
+      }
+      return this.add_lerps();
+    };
+
+    Bezier.prototype.build = function() {
+      var initial_points, l, len, margin, point, range;
+      this.reset();
+      initial_points = this.constructor.initial_points;
+      margin = LERPingSplines.create_point_margin;
+      range = 1.0 - (2.0 * margin);
+      this.reset_points();
+      for (l = 0, len = initial_points.length; l < len; l++) {
+        point = initial_points[l];
+        this.enable_point_at(point[0], point[1]);
+      }
+      this.update_enabled_points();
+      return console.log('Initial points created!');
     };
 
     Bezier.prototype.order_up_rebalance = function() {
@@ -686,14 +695,15 @@
 
     Spline.max_segments = 4;
 
-    Spline.initial_points = [[0.06, 0.82], [0.15, 0.08], [0.72, 0.18], [0.88, 0.90]];
+    Spline.initial_points = [[0.06, 0.82], [0.15, 0.08], [0.72, 0.18], [0.88, 0.90], [0.43, 0.84]];
 
     function Spline() {
       this.update_at = bind(this.update_at, this);
       Spline.__super__.constructor.apply(this, arguments);
-      this.segment_count = 0;
+      this.order = -1;
+      this.segment_count = -1;
       this.segment = [];
-      this.order = 3;
+      this.alloc_points();
     }
 
     Spline.prototype.log = function() {
@@ -704,6 +714,13 @@
       console.log('segments');
       console.log(this.segment);
       return console.log("\\\\\\ Spline State End");
+    };
+
+    Spline.prototype.reset = function() {
+      Spline.__super__.reset.apply(this, arguments);
+      this.order = -1;
+      this.segment_count = -1;
+      return this.segment = [];
     };
 
     Spline.prototype.t_min = function() {
@@ -754,68 +771,6 @@
       return this.constructor.max_order;
     };
 
-    Spline.prototype.update_order = function() {
-      if (this.ui_enabled) {
-        this.rebuild_spline();
-        if (this.order < this.max_order()) {
-          APP.add_order_btn.disabled = false;
-        } else {
-          APP.add_order_btn.disabled = true;
-        }
-        if (this.order > this.min_order()) {
-          APP.sub_order_btn.disabled = false;
-        } else {
-          APP.sub_order_btn.disabled = true;
-        }
-        return APP.num_order.textContent = "" + this.order;
-      }
-    };
-
-    Spline.prototype.add_order = function() {
-      if (this.order < this.max_order) {
-        this.order += 1;
-        return this.update_order();
-      }
-    };
-
-    Spline.prototype.sub_order = function() {
-      if (this.order > this.min_order) {
-        this.order -= 1;
-        return this.update_order();
-      }
-    };
-
-    Spline.prototype.update_enabled_segments = function() {
-      if (this.ui_enabled) {
-        if (this.enabled_segments < this.max_segments()) {
-          APP.add_segment_btn.disabled = false;
-        } else {
-          APP.add_segment_btn.disabled = true;
-        }
-        if (this.enabled_segments > this.min_segments()) {
-          APP.sub_segment_btn.disabled = false;
-        } else {
-          APP.sub_segment_btn.disabled = true;
-        }
-        return APP.num_segments.textContent = "" + this.enabled_segments;
-      }
-    };
-
-    Spline.prototype.add_segment = function() {
-      if (this.segment_count < this.max_segments()) {
-        this.segment_count += 1;
-        return this.update_enabled_segments();
-      }
-    };
-
-    Spline.prototype.sub_segment = function() {
-      if (this.segment_count > this.min_segments()) {
-        this.segment_count -= 1;
-        this.segment[this.segment_count].enabled = false;
-        return this.update_enabled_segments();
-      }
-    };
-
     Spline.prototype.enable_point = function(rebalance_points) {
       return APP.assert_never_reached();
     };
@@ -824,30 +779,20 @@
       return APP.assert_never_reached();
     };
 
-    Spline.prototype.add_initial_points = function(initial_points) {
-      var i, l, margin, prev, range, ref, x, y;
-      if (initial_points == null) {
-        initial_points = this.constructor.initial_points;
-      }
-      margin = LERPingSplines.create_point_margin;
-      range = 1.0 - (2.0 * margin);
+    Spline.prototype.alloc_points = function() {
+      var i, l, prev, ref, results;
       this.points[0] = [];
       prev = null;
+      results = [];
       for (i = l = 0, ref = this.max_points(); 0 <= ref ? l <= ref : l >= ref; i = 0 <= ref ? ++l : --l) {
-        x = margin + (range * Math.random());
-        y = margin + (range * Math.random());
-        this.points[i] = new Point(x * APP.graph_width, y * APP.graph_height);
+        this.points[i] = new Point();
         if (prev != null) {
           prev.next = this.points[i];
           this.points[i].prev = prev;
         }
-        prev = this.points[i];
+        results.push(prev = this.points[i]);
       }
-      this.rebuild_spline(initial_points);
-      this.update_order();
-      this.update_enabled_segments();
-      this.log();
-      return console.log('Initial points & segments created!');
+      return results;
     };
 
     Spline.prototype.joining_points_for_order = function(order) {
@@ -867,33 +812,36 @@
       return results;
     };
 
-    Spline.prototype.rebuild_spline = function(initial_points) {
-      var cidx, end_idx, i, index, j, l, label, len, len1, m, margin, next, o, p, pidx, point, pos, prev, range, ref, ref1, seg_points, start_idx, u;
-      if (initial_points == null) {
-        initial_points = null;
-      }
-      margin = LERPingSplines.create_point_margin;
-      range = 1.0 - (2.0 * margin);
+    Spline.prototype.build = function(order, sc) {
+      var cidx, end_idx, i, index, initial_points, j, l, label, len, m, next, o, p, pidx, point, pos, prev, ref, ref1, ref2, ref3, seg_points, start_idx, u;
+      this.reset();
+      this.order = order;
+      this.segment_count = sc;
+      initial_points = this.constructor.initial_points;
       if (initial_points == null) {
         initial_points = this.joining_points_for_order(this.order);
         console.log('initial_points', initial_points);
       }
-      for (index = l = 0, len = initial_points.length; l < len; index = ++l) {
+      this.enabled_points = 0;
+      if (!((this.min_segments() <= (ref = this.segment_count) && ref <= this.max_segments()))) {
+        APP.fatal_error("bad @segment_count value: " + this.segment_count);
+      }
+      for (index = l = 0, ref1 = this.segment_count; 0 <= ref1 ? l <= ref1 : l >= ref1; index = 0 <= ref1 ? ++l : --l) {
         point = initial_points[index];
         pidx = index * this.order;
         this.points[pidx].enabled = true;
-        this.points[pidx].x = (margin + (range * point[0])) * APP.graph_width;
-        this.points[pidx].y = (margin + (range * point[1])) * APP.graph_height;
+        this.enabled_points += 1;
+        this.points[pidx].set_fract_position(point[0], point[1]);
         this.points[pidx].set_label(LERPingSplines.point_labels[index]);
         this.points[pidx].knot = true;
-        this.segment_count += 1;
         if (index > 0) {
-          for (j = m = 1, ref = this.order - 1; 1 <= ref ? m <= ref : m >= ref; j = 1 <= ref ? ++m : --m) {
+          for (j = m = 1, ref2 = this.order - 1; 1 <= ref2 ? m <= ref2 : m >= ref2; j = 1 <= ref2 ? ++m : --m) {
             cidx = pidx - this.order + j;
             prev = this.points[pidx - this.order];
             next = this.points[pidx];
             pos = Vec2.lerp(prev, next, j / this.order);
             this.points[cidx].enabled = true;
+            this.enabled_points += 1;
             this.points[cidx].x = pos.x;
             this.points[cidx].y = pos.y;
             label = "" + prev.label + next.label + j;
@@ -904,7 +852,7 @@
         }
       }
       this.enabled_segments = 0;
-      for (i = o = 0, ref1 = this.max_segments(); 0 <= ref1 ? o <= ref1 : o >= ref1; i = 0 <= ref1 ? ++o : --o) {
+      for (i = o = 0, ref3 = this.max_segments(); 0 <= ref3 ? o <= ref3 : o >= ref3; i = 0 <= ref3 ? ++o : --o) {
         start_idx = i * this.order;
         end_idx = start_idx + this.order + 1;
         if (end_idx >= this.current_max_points()) {
@@ -915,7 +863,7 @@
         this.segment[i].disable_ui();
         this.segment[i].set_points(seg_points);
         this.segment[i].enabled = true;
-        for (u = 0, len1 = seg_points.length; u < len1; u++) {
+        for (u = 0, len = seg_points.length; u < len; u++) {
           p = seg_points[u];
           if (!p.enabled) {
             this.segment[i].enabled = false;
@@ -926,7 +874,12 @@
           this.enabled_segments += 1;
         }
       }
-      APP.num_segments;
+      this.expected_points = 1;
+      this.expected_points += this.segment_count;
+      this.expected_points += this.segment_count * (this.order - 1);
+      if (this.expected_points !== this.enabled_points) {
+        APP.fatal_error("Wrong number of enabled points! Expected " + this.expected_points + ", have enabled " + this.enabled_points + " (order=" + this.order + " segment_count=" + this.segment_count);
+      }
       return this.mirror_knot_neighbors();
     };
 
@@ -1183,8 +1136,6 @@
         max_x: this.graph_width - LERPingSplines.point_label_flip_margin,
         max_y: this.graph_height - LERPingSplines.point_label_flip_margin
       };
-      this.bezier_curve = new Bezier();
-      this.spline_curve = new Spline();
       this.tvar = this.context.getElementById('tvar');
       this.tslider_btn_min = this.find_element('tbox_slider_btn_min');
       this.tslider_btn_min.addEventListener('click', this.on_tslide_btn_min_click);
@@ -1235,8 +1186,12 @@
       }
       this.algorithmbox = this.find_element('algorithmbox');
       this.algorithm_text = this.find_element('algorithm_text');
-      this.bezier_curve.add_initial_points();
-      this.spline_curve.add_initial_points();
+      this.bezier_curve = new Bezier();
+      this.build_bezier();
+      this.spline_order = 3;
+      this.spline_segments = 3;
+      this.spline_curve = new Spline();
+      this.build_spline();
       this.option.mode.change();
       this.reset_loop();
       this.shift = false;
@@ -1354,6 +1309,16 @@
       return this.loop_running = false;
     };
 
+    LERPingSplines.prototype.build_bezier = function() {
+      return this.bezier_curve.build();
+    };
+
+    LERPingSplines.prototype.build_spline = function() {
+      this.spline_curve.build(this.spline_order, this.spline_segments);
+      this.update_order();
+      return this.update_segments();
+    };
+
     LERPingSplines.prototype.configure_for_bezier_mode = function() {
       console.log("configure for mode: bezier");
       this.bezier_mode = true;
@@ -1427,23 +1392,69 @@
       return this.update_and_draw();
     };
 
+    LERPingSplines.prototype.update_order = function() {
+      if (!this.spline_curve) {
+        return;
+      }
+      if (this.spline_order < this.spline_curve.max_order()) {
+        this.add_order_btn.disabled = false;
+      } else {
+        this.add_order_btn.disabled = true;
+      }
+      if (this.spline_order > this.spline_curve.min_order()) {
+        this.sub_order_btn.disabled = false;
+      } else {
+        this.sub_order_btn.disabled = true;
+      }
+      return this.num_order.textContent = "" + this.spline_order;
+    };
+
     LERPingSplines.prototype.on_add_order_btn_click = function(event, ui) {
-      this.curve.add_order();
+      if (this.spline_order < this.spline_curve.max_order()) {
+        this.spline_order += 1;
+        this.build_spline();
+      }
       return this.update_and_draw();
     };
 
     LERPingSplines.prototype.on_sub_order_btn_click = function(event, ui) {
-      this.curve.sub_order();
+      if (this.spline_order > this.spline_curve.min_order()) {
+        this.spline_order -= 1;
+        this.build_spline();
+      }
       return this.update_and_draw();
     };
 
+    LERPingSplines.prototype.update_segments = function() {
+      if (!this.spline_curve) {
+        return;
+      }
+      if (this.spline_segments < this.spline_curve.max_segments()) {
+        this.add_segment_btn.disabled = false;
+      } else {
+        this.add_segment_btn.disabled = true;
+      }
+      if (this.spline_segments > this.spline_curve.min_segments()) {
+        this.sub_segment_btn.disabled = false;
+      } else {
+        this.sub_segment_btn.disabled = true;
+      }
+      return this.num_segments.textContent = "" + this.spline_segments;
+    };
+
     LERPingSplines.prototype.on_add_segment_btn_click = function(event, ui) {
-      this.curve.add_segment();
+      if (this.spline_segments < this.spline_curve.max_segments()) {
+        this.spline_segments += 1;
+        this.build_spline();
+      }
       return this.update_and_draw();
     };
 
     LERPingSplines.prototype.on_sub_segment_btn_click = function(event, ui) {
-      this.curve.sub_segment();
+      if (this.spline_segments > this.spline_curve.min_segments()) {
+        this.spline_segments -= 1;
+        this.build_spline();
+      }
       return this.update_and_draw();
     };
 
@@ -2075,11 +2086,9 @@ class Matrix {
 ;
 
   Point = (function() {
-    function Point(x, y, color1) {
+    function Point(color1) {
       this.color = color1;
-      this.enabled = false;
-      this.hover = false;
-      this.selected = false;
+      this.reset();
       this.order = 0;
       this.radius = LERPingSplines.point_radius;
       if (this.color == null) {
@@ -2089,16 +2098,22 @@ class Matrix {
         this.label_color = '#000';
       }
       this.show_label = true;
+      this.set_random_position();
       this.position = {
-        x: x,
-        y: y
+        x: this.x,
+        y: this.y
       };
       this.label_position = {
-        x: x,
-        y: y
+        x: this.x,
+        y: this.y
       };
-      this.move(x, y);
     }
+
+    Point.prototype.reset = function() {
+      this.enabled = false;
+      this.hover = false;
+      return this.selected = false;
+    };
 
     Point.prototype.set_label = function(label1) {
       this.label = label1;
@@ -2109,6 +2124,19 @@ class Matrix {
 
     Point.prototype.get_label = function() {
       return this.label;
+    };
+
+    Point.prototype.set_random_position = function() {
+      return this.set_fract_position(Math.random(), Math.random());
+    };
+
+    Point.prototype.set_fract_position = function(x, y) {
+      var margin, range;
+      margin = LERPingSplines.create_point_margin;
+      range = 1.0 - (2.0 * margin);
+      x = margin + (range * x);
+      y = margin + (range * y);
+      return this.move(x * APP.graph_width, y * APP.graph_height);
     };
 
     Point.prototype.move = function(x, y) {

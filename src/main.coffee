@@ -85,9 +85,6 @@ class LERPingSplines
       max_x: @graph_width  - LERPingSplines.point_label_flip_margin
       max_y: @graph_height - LERPingSplines.point_label_flip_margin
 
-    @bezier_curve = new Bezier()
-    @spline_curve = new Spline()
-
     @tvar = @context.getElementById('tvar')
 
     @tslider_btn_min = @find_element('tbox_slider_btn_min')
@@ -144,8 +141,13 @@ class LERPingSplines
     @algorithmbox   = @find_element('algorithmbox')
     @algorithm_text = @find_element('algorithm_text')
 
-    @bezier_curve.add_initial_points()
-    @spline_curve.add_initial_points()
+    @bezier_curve = new Bezier()
+    @build_bezier()
+
+    @spline_order = 3
+    @spline_segments = 3
+    @spline_curve = new Spline()
+    @build_spline()
 
     @option.mode.change()
 
@@ -239,6 +241,14 @@ class LERPingSplines
   loop_stop: ->
     @loop_running = false
 
+  build_bezier: ->
+    @bezier_curve.build()
+
+  build_spline: ->
+    @spline_curve.build(@spline_order, @spline_segments)
+    @update_order()
+    @update_segments()
+
   configure_for_bezier_mode: ->
     console.log("configure for mode: bezier")
     @bezier_mode = true
@@ -298,20 +308,58 @@ class LERPingSplines
     @curve.disable_point()
     @update_and_draw()
 
+  update_order: ->
+    return unless @spline_curve
+
+    if @spline_order < @spline_curve.max_order()
+      @add_order_btn.disabled = false
+    else
+      @add_order_btn.disabled = true
+
+    if @spline_order > @spline_curve.min_order()
+      @sub_order_btn.disabled = false
+    else
+      @sub_order_btn.disabled = true
+
+    @num_order.textContent = "#{@spline_order}"
+
   on_add_order_btn_click: (event, ui) =>
-    @curve.add_order()
+    if @spline_order < @spline_curve.max_order()
+      @spline_order += 1
+      @build_spline()
     @update_and_draw()
 
   on_sub_order_btn_click: (event, ui) =>
-    @curve.sub_order()
+    if @spline_order > @spline_curve.min_order()
+      @spline_order -= 1
+      @build_spline()
     @update_and_draw()
 
+  update_segments: ->
+    return unless @spline_curve
+
+    if @spline_segments < @spline_curve.max_segments()
+      @add_segment_btn.disabled = false
+    else
+      @add_segment_btn.disabled = true
+
+    if @spline_segments > @spline_curve.min_segments()
+      @sub_segment_btn.disabled = false
+    else
+      @sub_segment_btn.disabled = true
+
+    @num_segments.textContent = "#{@spline_segments}"
+
   on_add_segment_btn_click: (event, ui) =>
-    @curve.add_segment()
+    if @spline_segments < @spline_curve.max_segments()
+      @spline_segments += 1
+      @build_spline()
     @update_and_draw()
 
   on_sub_segment_btn_click: (event, ui) =>
-    @curve.sub_segment()
+    if @spline_segments > @spline_curve.min_segments()
+      @spline_segments -= 1
+      @build_spline()
     @update_and_draw()
 
   on_btn_play_pause_click: (event, ui) =>

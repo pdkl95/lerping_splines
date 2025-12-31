@@ -20,11 +20,8 @@
 ##############################################################################
 
 class Point
-  constructor: (x, y, @color) ->
-    @enabled = false
-
-    @hover = false
-    @selected = false
+  constructor: (@color) ->
+    @reset()
 
     @order = 0
     @radius = LERPingSplines.point_radius
@@ -32,15 +29,20 @@ class Point
     @label_color ?= '#000'
     @show_label = true
 
+    @set_random_position()
+
     @position =
-      x: x
-      y: y
+      x: @x
+      y: @y
 
     @label_position =
-      x: x
-      y: y
+      x: @x
+      y: @y
 
-    @move x, y
+  reset: ->
+    @enabled = false;
+    @hover = false
+    @selected = false
 
   set_label: (@label) ->
     @label_metrics = APP.graph_ctx.measureText(@label)
@@ -49,6 +51,18 @@ class Point
 
   get_label: ->
     @label
+
+  set_random_position: ->
+    @set_fract_position(Math.random(), Math.random())
+
+  set_fract_position: (x, y) ->
+    margin = LERPingSplines.create_point_margin
+    range = 1.0 - (2.0 * margin)
+
+    x = margin + (range * x)
+    y = margin + (range * y)
+
+    @move(x * APP.graph_width, y * APP.graph_height)
 
   move: (x, y) ->
     @x = x

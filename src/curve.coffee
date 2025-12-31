@@ -35,6 +35,9 @@ class Curve
 
     @pen_label_offset_length = Vec2.magnitude(@pen_label_offset)
 
+  reset: ->
+    @reset_points()
+
   disable_ui: ->
     @ui_enabled = false
 
@@ -81,25 +84,9 @@ class Curve
     @setup_label()
     @setup_pen()
 
-  add_initial_points: (initial_points = @constructor.initial_points) ->
-    margin = LERPingSplines.create_point_margin
-    range = 1.0 - (2.0 * margin)
-
-    @points[0] = []
-    for i in [0..@max_points()]
-      x = margin + (range * Math.random())
-      y = margin + (range * Math.random())
-      @points[0][i] = new Point(x * APP.graph_width, y * APP.graph_height)
-      @points[0][i].set_label( LERPingSplines.point_labels[i] )
-
-    @add_lerps()
-
-    for point in initial_points
-      @enable_point_at( point[0], point[1] )
-
-    @update_enabled_points()
-
-    console.log('Initial points created!')
+  reset_points: ->
+    for p from @each_point()
+      p.reset()
 
   find_point: (x, y) ->
     for p from @each_point()
@@ -144,7 +131,7 @@ class Curve
     return if @enabled_points >= @max_points()
     p = @points[0][@enabled_points]
 
-    if rebalance_points and APP.option.rebalance_points_on_order_up.value
+    if rebalance_points and APP.option.rebalance_points_on_order_up.value and APP.bezier_mode
       @order_up_rebalance()
 
     p.enabled = true
@@ -163,7 +150,7 @@ class Curve
   disable_point: ->
     return if @enabled_points <= @min_points()
 
-    if @enabled_points > 3 and APP.option.rebalance_points_on_order_down.value
+    if @enabled_points > 3 and APP.option.rebalance_points_on_order_down.value and APP.bezier_mode
       @compute_lower_order_curve()
 
     @enabled_points -= 1
@@ -343,23 +330,46 @@ class Bezier extends Curve
     [ 0.72, 0.18 ]
   ]
 
+  constructor: ->
+    super
+    @alloc_points()
+
   t_min: ->
     0.0
 
   t_max: ->
     1.0
 
-  add_order: ->
-    APP.assert_never_reached()
-
-  sub_order: ->
-    APP.assert_never_reached()
-
   add_segment: ->
     APP.assert_never_reached()
 
   sub_segment: ->
     APP.assert_never_reached()
+
+  alloc_points: ->
+    @points[0] = []
+
+    for i in [0..@max_points()]
+      @points[0][i] = new Point()
+      @points[0][i].set_label( LERPingSplines.point_labels[i] )
+
+    @add_lerps()
+
+  build: ->
+    @reset()
+
+    initial_points = @constructor.initial_points
+    margin = LERPingSplines.create_point_margin
+    range = 1.0 - (2.0 * margin)
+
+    @reset_points()
+
+    for point in initial_points
+      @enable_point_at( point[0], point[1] )
+
+    @update_enabled_points()
+
+    console.log('Initial points created!')
 
   order_up_rebalance: ->
     cur_id = @enabled_points
@@ -499,15 +509,19 @@ class Spline extends Curve
     [ 0.06, 0.82 ],
     [ 0.15, 0.08 ],
     [ 0.72, 0.18 ],
-    [ 0.88, 0.90 ]
+    [ 0.88, 0.90 ],
+    [ 0.43, 0.84 ]
   ]
 
   constructor: ->
     super
 
-    @segment_count = 0
+    @order = -1
+    @segment_count = -1
+
     @segment = []
-    @order = 3
+
+    @alloc_points()
 
   log: ->
     console.log("/// Spline State: order=#{@order} segment_count=#{@segment_count}")
@@ -517,6 +531,12 @@ class Spline extends Curve
     console.log('segments')
     console.log(@segment)
     console.log("\\\\\\ Spline State End")
+
+  reset: ->
+    super
+    @order = -1
+    @segment_count = -1
+    @segment = []
 
   t_min: ->
     0.0
@@ -554,88 +574,22 @@ class Spline extends Curve
   max_order: ->
     @constructor.max_order
 
-  update_order: ->
-    #@rebuild_spline()
-
-    if @ui_enabled
-      @rebuild_spline()
-      if @order < @max_order()
-        APP.add_order_btn.disabled = false
-      else
-        APP.add_order_btn.disabled = true
-
-      if @order > @min_order()
-        APP.sub_order_btn.disabled = false
-      else
-        APP.sub_order_btn.disabled = true
-
-      APP.num_order.textContent = "#{@order}"
-
-  add_order: ->
-    if @order < @max_order
-      @order += 1
-      @update_order()
-
-  sub_order: ->
-    if @order > @min_order
-      @order -= 1
-      @update_order()
-
-  update_enabled_segments: ->
-    #@rebuild_spline()
-
-    if @ui_enabled
-      if @enabled_segments < @max_segments()
-        APP.add_segment_btn.disabled = false
-      else
-        APP.add_segment_btn.disabled = true
-
-      if @enabled_segments > @min_segments()
-        APP.sub_segment_btn.disabled = false
-      else
-        APP.sub_segment_btn.disabled = true
-
-      APP.num_segments.textContent = "#{@enabled_segments}"
-
-  add_segment: ->
-    if @segment_count < @max_segments()
-      @segment_count += 1
-      @update_enabled_segments()
-
-  sub_segment: ->
-    if @segment_count > @min_segments()
-      @segment_count -= 1
-      @segment[@segment_count].enabled = false
-      @update_enabled_segments()
-
   enable_point: (rebalance_points) ->
     APP.assert_never_reached()
 
   disable_point: (rebalance_points) ->
     APP.assert_never_reached()
 
-  add_initial_points: (initial_points = @constructor.initial_points) ->
-    margin = LERPingSplines.create_point_margin
-    range = 1.0 - (2.0 * margin)
+  alloc_points: () ->
     @points[0] = []
     prev = null
     for i in [0..@max_points()]
-      x = margin + (range * Math.random())
-      y = margin + (range * Math.random())
-      @points[i] = new Point(x * APP.graph_width, y * APP.graph_height)
+      @points[i] = new Point()
       #@points[i].set_label( LERPingSplines.point_labels[i] )
       if prev?
         prev.next = @points[i]
         @points[i].prev = prev
       prev = @points[i]
-
-    #@log()
-    @rebuild_spline(initial_points)
-    @update_order()
-    @update_enabled_segments()
-    @log()
-
-    console.log('Initial points & segments created!')
 
   joining_points_for_order: (order) ->
     n = 0
@@ -646,23 +600,30 @@ class Spline extends Curve
         n = order
       n--
 
-  rebuild_spline: (initial_points = null) ->
-    margin = LERPingSplines.create_point_margin
-    range = 1.0 - (2.0 * margin)
+  build: (order, sc) ->
+    @reset()
+
+    @order = order
+    @segment_count = sc
+
+    initial_points = @constructor.initial_points
 
     unless initial_points?
       initial_points = @joining_points_for_order(@order)
       console.log('initial_points', initial_points)
 
-    for point, index in initial_points
+    @enabled_points = 0
+    unless @min_segments() <= @segment_count <= @max_segments()
+      APP.fatal_error("bad @segment_count value: #{@segment_count}")
+    for index in [0..@segment_count]
+      point = initial_points[index]
       pidx = index * @order
       #console.log(">>pidx=#{pidx} label=\"#{LERPingSplines.point_labels[index]}\"")
       @points[pidx].enabled = true
-      @points[pidx].x = (margin + (range * point[0])) * APP.graph_width
-      @points[pidx].y = (margin + (range * point[1])) * APP.graph_height
+      @enabled_points += 1
+      @points[pidx].set_fract_position(point[0], point[1])
       @points[pidx].set_label( LERPingSplines.point_labels[index] )
       @points[pidx].knot = true
-      @segment_count += 1
 
       if index > 0
         for j in [1..(@order-1)]
@@ -671,6 +632,7 @@ class Spline extends Curve
           next = @points[pidx]
           pos = Vec2.lerp(prev, next, j / @order)
           @points[cidx].enabled = true
+          @enabled_points += 1
           @points[cidx].x = pos.x
           @points[cidx].y = pos.y
           label = "#{prev.label}#{next.label}#{j}"
@@ -700,7 +662,13 @@ class Spline extends Curve
       if @segment[i].enabled
         @enabled_segments += 1
 
-    APP.num_segments
+    @expected_points  = 1                # starting knot
+    @expected_points += @segment_count   # knot at the end of each segment
+    @expected_points += @segment_count * (@order - 1)  # control points between knots
+
+    if @expected_points != @enabled_points
+      APP.fatal_error("Wrong number of enabled points! Expected #{@expected_points}, have enabled #{@enabled_points} (order=#{@order} segment_count=#{@segment_count}")
+
     @mirror_knot_neighbors()
 
   mirror_knot_neighbors: ->
