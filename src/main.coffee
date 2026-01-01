@@ -149,9 +149,12 @@ class LERPingSplines
     @spline_curve = new Spline()
     @build_spline()
 
-    @option.mode.change()
+    @matrix_spline_curve = new MatrixSpline()
+    @build_matrix_spline()
 
     @reset_loop()
+
+    @option.mode.change()
 
     @shift = false
 
@@ -232,8 +235,9 @@ class LERPingSplines
 
   reset_loop: ->
     @t = 0
+    @t_real = 0
     @t_step = 0.002
-    @set_tslider_position(@tslider.min)
+    @set_tslider_position(@tslider.min, false)
 
   loop_start: ->
     @loop_running = true
@@ -249,10 +253,15 @@ class LERPingSplines
     @update_order()
     @update_segments()
 
+  build_matrix_spline: ->
+    @matrix_spline_curve.build(3, @spline_segments)
+    @update_segments()
+
   configure_for_bezier_mode: ->
     console.log("configure for mode: bezier")
     @bezier_mode = true
     @spline_mode = false
+    @matrix_spline_mode = false
     @curve = @bezier_curve
 
     @order_wrapper.classList.add('hidden')
@@ -265,9 +274,23 @@ class LERPingSplines
     console.log("configure for mode: spline")
     @bezier_mode = false
     @spline_mode = true
+    @matrix_spline_mode = false
     @curve = @spline_curve
 
     @order_wrapper.classList.remove('hidden')
+    @segment_wrapper.classList.remove('hidden')
+    @points_wrapper.classList.add('hidden')
+
+    @update_and_draw()
+
+  configure_for_matrix_spline_mode: ->
+    console.log("configure for mode: matrix spline")
+    @bezier_mode = false
+    @spline_mode = false
+    @matrix_spline_mode = true
+    @curve = @matrix_spline_curve
+
+    @order_wrapper.classList.add('hidden')
     @segment_wrapper.classList.remove('hidden')
     @points_wrapper.classList.add('hidden')
 
@@ -279,6 +302,7 @@ class LERPingSplines
     switch mode
       when 'bezier' then @configure_for_bezier_mode()
       when 'spline' then @configure_for_spline_mode()
+      when 'matrix_spline' then @configure_for_matrix_spline_mode()
       else
         @fatal_error("bad mode name \"#{mode}\"")
 
@@ -348,7 +372,7 @@ class LERPingSplines
     else
       @sub_segment_btn.disabled = true
 
-    @num_segments.textContent = "#{@spline_segments}"
+    @num_segments.textContent = "#{@spline_segments - 1}"
 
   on_add_segment_btn_click: (event, ui) =>
     if @spline_segments < @spline_curve.max_segments()
@@ -365,18 +389,16 @@ class LERPingSplines
   on_btn_play_pause_click: (event, ui) =>
     if @running
       @stop()
-      console.log(@curve)
-      console.log(@curve.points)
     else
       @start()
 
-  set_tslider_position: (x) ->
+  set_tslider_position: (x, update_t = true) ->
     x = @tslider.min if x < @tslider.min
     x = @tslider.max if x > @tslider.max
 
     @tslider.position = x
     @tslider.handle.style.left = "#{x}px"
-    @set_t_perc( (x - @tslider.min) / @tslider.range )
+    @set_t_perc( (x - @tslider.min) / @tslider.range ) if update_t
 
   on_tslider_bg_click: (event) =>
     cc = @tslider_bg.getBoundingClientRect()
@@ -487,7 +509,7 @@ class LERPingSplines
         p.x = mouse.x
         p.y = mouse.y
 
-        if @spline_mode && (@curve.order == 3) && APP.option.connect_cubic_control_points.get()
+        if (@spline_mode or @matrix_spline_mode) and (@curve.order == 3) and APP.option.connect_cubic_control_points.get()
           if p.knot
             if p.prev?
               p.prev.x += dx
@@ -562,8 +584,6 @@ class LERPingSplines
 
   redraw_ui: (render_bitmap_preview = true) =>
     @graph_ui_ctx.clearRect(0, 0, @graph_ui_canvas.width, @graph_ui_canvas.height)
-
-    #@cur?.draw_ui()
 
     for order in @canvas.points
       for p in order

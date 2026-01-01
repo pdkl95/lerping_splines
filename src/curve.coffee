@@ -210,6 +210,7 @@ class Curve
       p.draw()
 
   get_normal: ->
+    return null unless @pen?
     @update_at(APP.t - APP.t_step)
     @pen.prev_position.x = @pen.position.x
     @pen.prev_position.y = @pen.position.y
@@ -225,8 +226,8 @@ class Curve
       null
 
   draw_pen: ->
-    return unless @pen?
     normal = @get_normal()
+    return unless normal?
     if normal?
       arrow       = Vec2.scale(normal, 22.0)
       arrowtip    = Vec2.scale(normal, 15.0)
@@ -600,6 +601,11 @@ class Spline extends Curve
         n = order
       n--
 
+  new_segment: ->
+    segment = new Bezier()
+    segment.disable_ui()
+    segment
+
   build: (order, sc) ->
     @reset()
 
@@ -650,8 +656,7 @@ class Spline extends Curve
       #console.log("giving segment #{i} points #{start_idx} -> #{end_idx - 1}")
       seg_points = @points.slice(start_idx, end_idx)
       #console.log("  -> [ #{seg_points.map( (x) -> "\"#{x.label}\"" ).join(', ')} ]")
-      @segment[i] = new Bezier()
-      @segment[i].disable_ui()
+      @segment[i] = @new_segment()
       @segment[i].set_points( seg_points )
       @segment[i].enabled = true;
       for p in seg_points
@@ -739,3 +744,296 @@ class Spline extends Curve
 
   get_algorithm_text: ->
     ''
+
+class MatrixSplineSegment
+  constructor: ->
+
+  set_points: (points) ->
+    @points = points
+
+  each_point: (include_first = true) ->
+    first = true
+    for p in @points
+      if first
+        first = false
+        yield p if include_first
+      else
+        yield p
+    return
+
+  find_point: (x, y) ->
+    for p from @each_point()
+      if p?.contains(x. y)
+        return p
+    return null
+
+  draw_handles: ->
+    ctx = APP.graph_ctx
+    ctx.beginPath()
+    ctx.lineWidth = 2
+    #ctx.strokeStyle = '#777777'
+    ctx.strokeStyle = '#666666'
+    ctx.globalOpacity = 1.0
+
+    if @points[0]? and @points[1]?
+      ctx.moveTo(@points[0].x, @points[0].y)
+      ctx.lineTo(@points[1].x, @points[1].y)
+    if @points[2]? and @points[3]?
+      ctx.moveTo(@points[3].x, @points[3].y)
+      ctx.lineTo(@points[2].x, @points[2].y)
+
+    ctx.setLineDash([3,5])
+    ctx.stroke()
+    ctx.setLineDash([])
+
+  update_at: (t) ->
+    for p from @each_point()
+      p.update(t)
+
+  update: ->
+    @update_at(APP.t)
+
+  draw: ->
+    @draw_handles()
+    for p from @each_point()
+      p.draw()
+
+  get_cubic_derivative: (t) ->
+    mt = 1 - t
+    a = mt * mt
+    b = 2 * mt * t
+    c = t*t
+    d0x = 3 * (@points[1].x - @points[0].x)
+    d0y = 3 * (@points[1].y - @points[0].y)
+    d1x = 3 * (@points[2].x - @points[1].x)
+    d1y = 3 * (@points[2].y - @points[1].y)
+    d2x = 3 * (@points[3].x - @points[2].x)
+    d2y = 3 * (@points[3].y - @points[2].y)
+    return
+      x: a * d0x + b * d1x + c * d2x,
+      y: a * d0y + b * d1y + c * d2y
+
+  get_normal: (t) ->
+    d = @get_cubic_derivative(t)
+    m = Math.sqrt(d.x * d.x + d.y * d.y)
+    d.x = d.x / m
+    d.y = d.y / m
+    q = Math.sqrt(d.x * d.x + d.y * d.y)
+    return
+      x: -d.y / q
+      y:  d.x / q
+
+class MatrixSpline extends Spline
+  @default_matrix: 'bezier'
+  #@default_matrix: 'hermite'
+  #@default_matrix: 'catmullrom'
+  #@default_matrix: 'bspline'
+  @type:
+    bezier:
+      name: "Bezier"
+      scale: 1.0
+      char_matrix: [
+        [  1,  0,  0,  0 ],
+        [ -3,  3,  0,  0 ],
+        [  3, -6,  3,  0 ],
+        [ -1,  3, -3,  1 ]
+      ]
+      color: '#D5A9EF'
+
+    hermite:
+      name: "Hermite"
+      scale: 1.0
+      char_matrix: [
+        [  1,  0,  0,  0 ],
+        [  0,  0,  1,  0 ],
+        [ -3,  3, -2, -1 ],
+        [  2, -2,  1,  1 ]
+      ]
+      color: '#83A2D6'
+
+    catmullrom:
+      name: "Catmull-Rom"
+      scale: (1.0/2.0)
+      char_matrix: [
+        [  0,  2,  0,  0 ],
+        [ -1,  0,  1,  0 ],
+        [  2, -5,  4, -1 ],
+        [ -1,  3, -3,  1 ]
+      ]
+      color: '#94D683'
+
+    bspline:
+      name: "B-Spline"
+      scale: (1.0/6.0)
+      char_matrix: [
+        [  1,  4,  1,  0 ],
+        [ -3,  0,  3,  0 ],
+        [  3, -6,  3,  0 ],
+        [ -1,  3, -3,  1 ]
+      ]
+      color: '#E3A445'
+
+  constructor: ->
+    @render =
+      type_name: null
+      name: null
+      scale: null
+      char_matrix: null
+      color: null
+
+    @use_matrix_type(@constructor.default_matrix)
+    @t_matrix = new Matrix([[0,0,0,0]])
+    super
+
+  use_matrix_type: (type_name) ->
+    @render.type_name = @type_name
+    @render.name = @constructor.type[type_name].name
+    @render.scale = @constructor.type[type_name].scale
+    @render.char_matrix = new Matrix(@constructor.type[type_name].char_matrix)
+    @render.color = @constructor.type[type_name].color
+
+  find_pen: ->
+    p = @points[0]
+    if p?.enabled
+      p
+    else
+      APP.debug("missing pen") unless p
+      null
+
+  new_segment: ->
+    new MatrixSplineSegment(this)
+
+  each_point: (include_first = true) ->
+    return unless @segment?
+    first = true
+    for s in @segment
+      for p from s.each_point(first)
+        if first
+          first = false
+          yield p if include_first
+        else
+          yield p
+    return
+
+  find_point: (x, y) ->
+    for p from @each_point()
+      if p?.contains(x, y)
+        return p
+    return null
+
+  set_t_matrix: (t) ->
+    @t_matrix.set(0, 0, 1)
+    @t_matrix.set(0, 1, t)
+    @t_matrix.set(0, 2, t * t)
+    @t_matrix.set(0, 3, t * t * t)
+
+  eval_segment_at: (t_segment, t) ->
+    @set_t_matrix(t)
+
+    m = @t_matrix.multiply(@render.char_matrix)
+    p = @segment[t_segment].points
+
+    total_x = 0.0
+    total_y = 0.0
+
+    for i in [0..3]
+      value = m.get(0, i)
+      total_x += value * p[i].x
+      total_y += value * p[i].y
+
+    return
+      x: total_x * @render.scale
+      y: total_y * @render.scale
+
+  eval_current_segment_at: (t) ->
+    @eval_segment_at(@current_segment, t)
+
+  separate_t: (t = APP.t_real) ->
+    t_segment = Math.floor(t)
+    t_fract = t - t_segment
+    if t >= @enabled_segments
+      t_segment = @enabled_segments - 1
+      t_fract = 1.0
+    return [t_segment, t_fract]
+
+  current_segment: ->
+    [t_segment, t_fract] = @separate_t(APP.t_real)
+    @segment[t_segment]
+
+  eval_at: (t) ->
+    [t_segment, t_fract] = @separate_t(t)
+    @eval_segment_at(t_segment, t_fract)
+
+  eval_current: ->
+    @eval_at(APP.t_real)
+
+  update_at: (t) =>
+    for s in @segment
+      s.update(t)
+
+  update: ->
+    @update_at(APP.t)
+
+  draw: ->
+    for s in @segment
+      s.draw()
+
+  draw_curve: (override_color = null) ->
+    return unless @points?
+
+    #p = @find_pen()
+
+    ctx = APP.graph_ctx
+    ctx.beginPath()
+    ctx.strokeStyle = @render.color
+    ctx.lineWidth = 3
+
+    t = 0.0
+    max_t = @segment_count + 1
+    position = @eval_at(t)
+    ctx.moveTo(position.x, position.y)
+    while t < max_t
+      t += 0.02
+      position = @eval_at(t)
+      ctx.lineTo(position.x, position.y)
+
+    ctx.stroke()
+
+  get_normal: (t = APP.t) ->
+    @current_segment().get_normal(t)
+
+  draw_ticks: ->
+
+  draw_pen: ->
+    normal = @get_normal()
+    if normal?
+      pen_position = @eval_current()
+      arrow       = Vec2.scale(normal, 22.0)
+      arrowtip    = Vec2.scale(normal, 15.0)
+      arrow_shaft = Vec2.scale(normal, 65.0)
+
+      angle = TAU / 8.0
+      arrow_side1 = Vec2.rotate(arrow, angle)
+      arrow_side2 = Vec2.rotate(arrow, -angle)
+
+      arrowtip.x += pen_position.x
+      arrowtip.y += pen_position.y
+
+      ctx = APP.graph_ctx
+      ctx.beginPath()
+      ctx.moveTo(arrowtip.x, arrowtip.y)
+      ctx.lineTo(arrowtip.x + arrow_shaft.x, arrowtip.y + arrow_shaft.y)
+      ctx.moveTo(arrowtip.x, arrowtip.y)
+      ctx.lineTo(arrowtip.x + arrow_side1.x, arrowtip.y + arrow_side1.y)
+      ctx.moveTo(arrowtip.x, arrowtip.y)
+      ctx.lineTo(arrowtip.x + arrow_side2.x, arrowtip.y + arrow_side2.y)
+      ctx.strokeStyle = '#000000'
+      ctx.lineWidth = 2
+      ctx.lineCap = "round"
+      ctx.stroke()
+
+      plabel_offset = Vec2.scale(Vec2.normalize(arrow_shaft), @pen_label_offset_length + 3)
+      plx = arrowtip.x + arrow_shaft.x + plabel_offset.x - @pen_label_offset.x
+      ply = arrowtip.y + arrow_shaft.y + plabel_offset.y - @pen_label_offset.y + @pen_label_height
+      ctx.fillStyle = '#000'
+      ctx.fillText(@pen_label, plx, ply);

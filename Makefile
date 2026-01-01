@@ -8,6 +8,7 @@ builddir   ?= $(top_srcdir)
 
 PROJECT = lerping_splines
 
+COFFEE_EXTRA_OPTS = --inline-map
 COFFEE ?= coffee --no-header --compile
 RM ?= rm -f
 
@@ -34,7 +35,7 @@ all: build
 build: $(TARGETS)
 
 $(PROJECT).js: $(PROJECT_COFFEE_SRC)
-	cat $^ | $(COFFEE) --stdio > $@
+	cat $^ | $(COFFEE) $(COFFEE_EXTRA_OPTS) --stdio > $@
 
 clean:
 	$(RM) $(TARGETS)

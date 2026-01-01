@@ -68,9 +68,6 @@ class Point
     @x = x
     @y = y
 
-    @ix = Math.floor(@x)
-    @iy = Math.floor(@y)
-
   contains: (x, y) ->
     dx = @x - x
     dy = @y - y

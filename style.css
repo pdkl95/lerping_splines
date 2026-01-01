@@ -506,17 +506,33 @@ button[disabled] {
 .choice_wrapper .choice {
   float: left;
   background-color: #EDC5B5;
-  border: 2px dashed #F9A483;
-  border-radius: 6px;
+  border: 2px outset #F9A483;
+  border-radius: 0;
   padding: 2px 5px;
   font-size: larger;
   font-weight: bold;
-  width: 4rem;
+  min-width: 4rem;
   text-align: center;
+  position: relative;
+  top: -1px;
+  left: -1px;
+}
+
+.choice_wrapper > .choice:first-of-type,
+.choice_wrapper > .choice.selected:first-of-type {
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px;
+}
+
+.choice_wrapper > .choice:last-of-type,
+.choice_wrapper > .choice.selected:last-of-type {
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
 }
 
 .choice_wrapper > .choice + .choice {
-  margin-left: 1rem;
+  margin-left: 0;
+  border-left: 1px solid #444;
 }
 
 .choice_wrapper .choice:hover {
@@ -527,7 +543,10 @@ button[disabled] {
 
 .choice_wrapper .choice.selected {
   background-color: #BDEDB5;
-  border-color: #5FEB47
+  border-color: #5FEB47;
+  border-style: inset;
+  top: 1px;
+  left: 1px;
 }
 
 .choice_wrapper .choice.selected:hover {
@@ -538,6 +557,7 @@ button[disabled] {
 .choice_wrapper .choice.disabled.selected {
   background-color: #bbb;
   border-color: #999;
+  border-style: none;
   color: #555;
 
 }
