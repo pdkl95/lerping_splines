@@ -6,7 +6,7 @@
     <link rel="stylesheet" type="text/css" media="screen" href="basic.css">
     <link rel="stylesheet" type="text/css" media="screen" href="style.css" title="app_stylesheet">
   </head>
-  <body>
+  <body id="body">
     <header>
       <h1 class="canvas_width">LERPing Splines</h1>
     </header>
@@ -40,27 +40,105 @@
           <button id="tbox_slider_btn_max" class="tbox_slider_btn">&#x23ED;</button>
         </div>
 
-        <div class="pointsbox buttonbox bbright">
+        <div class="pointsbox buttonbox bbright" id="pointsbox">
           <div id="points_wrapper" class="bbwrapper"><label id="points_label" for="num_points" class="bbwrappeditem">Points</label><button id="remove_point" class="btn bbwrappeditem">&#x2796;</button><div name="num_points" id="num_points" class="bbwrappeditem">4</div><button id="add_point" class="btn bbwrappeditem">&#x2795;</button></div>
         </div>
 
-        <div class="optbox buttonbox bbright">
-          <div id="show_ticks_wrapper" class="bbwrapper"><label for="show_ticks" id="show_ticks_label" class="bbwrappeditem">Tick Marks</label><input type="checkbox" name="show_ticks" id="show_ticks" class="bbwrappeditem"></input></div>
+        <div class="orderbox buttonbox bbright hidden" id="orderbox">
+          <div id="order_wrapper" class="bbwrapper"><label id="order_label" for="num_order" class="bbwrappeditem">Order</label><button id="sub_order" class="btn bbwrappeditem">&#x2796;</button><div name="num_order" id="num_order" class="bbwrappeditem">4</div><button id="add_order" class="btn bbwrappeditem">&#x2795;</button></div>
+        </div>
+
+        <div class="segmentbox buttonbox bbright hidden" id="segmentbox">
+          <div id="segment_wrapper" class="bbwrapper"><label id="segments_label" for="num_segments" class="bbwrappeditem">Segments</label><button id="sub_segment" class="btn bbwrappeditem">&#x2796;</button><div name="num_segments" id="num_segments" class="bbwrappeditem">4</div><button id="add_segment" class="btn bbwrappeditem">&#x2795;</button></div>
         </div>
       </div>
-    </div>
 
-    <div id="debugbox" class="hidden clear_both"></div>
+      <div id="debugbox" class="hidden clear_both canvas_width"></div>
 
-    <div id="algorithmbox" class="hidden clear_both canvas_width">
-      <h2>Algorithm</h2>
-      <h4>Lerp: Linear Intrpolaton</h4>
-      <pre>function Lerp(vector1, vector2, t) {
-    return ((1-t) * vector1) +
-           (   t  * vector2)
-}</pre>
-      <h4>It's Lerp All The Way Down</h4>
-      <pre id="algorithm_text"></pre>
+      <div id="alg_opt_box" class="clear_both canvas_width tabbox_wrapper">
+        <input type="radio" name="alg_opt_tabs" id="alg_opt_tabs_algorithm_input" class="tab_input" checked>
+        <label class="tab" for="alg_opt_tabs_algorithm_input"><h2>Algorithm</h2></label>
+        <input type="radio" name="alg_opt_tabs" id="alg_opt_tabs_options_input" class="tab_input">
+        <label class="tab" for="alg_opt_tabs_options_input"><h2>Options</h2></label>
+        <input type="radio" name="alg_opt_tabs" id="alg_opt_tabs_mode_input" class="tab_input">
+        <label class="tab" for="alg_opt_tabs_mode_input"><h2>Mode</h2></label>
+
+        <div id="alg_opt_tabbox-algorithm" class="tabcontent">
+          <div id="algorithmbox">
+            <h4>Lerp: Linear Intrpolaton</h4>
+            <pre>function Lerp(vector1, vector2, t) {
+              return ((1-t) * vector1) +
+              (   t  * vector2)
+              }</pre>
+            <h4>It's Lerp All The Way Down</h4>
+            <pre id="algorithm_text"></pre>
+          </div>
+        </div>
+
+        <div id="alg_opt_tabbox-options" class="tabcontent">
+          <table class="options">
+            <tr>
+              <th class="tt ttright" data-title="Only used for order-3 (cubic) splines!">Move control points with connecting knot.</th>
+              <td>
+                <input id="connect_cubic_control_points" type="checkbox" checked="checked" autocomplete="off">
+              </td>
+            </tr>
+            <tr>
+              <th class="tt ttright" data-title="The tick marks represent the parametric distance fraction of 't', not length">Show Ticks</th>
+              <td>
+                <input id="show_ticks" type="checkbox" checked="checked" autocomplete="off">
+              </td>
+            </tr>
+            <tr>
+              <th class="tt ttright" data-title="The arrow labeled 'P'">Show pen label</th>
+              <td>
+                <input id="show_pen_label" type="checkbox" checked="checked" autocomplete="off">
+              </td>
+            </tr>
+            <tr>
+              <th class="tt ttright" data-title="Disable if th t4xt b=is getting too large">Show Algorithm</th>
+              <td>
+                <input id="show_algorithm" type="checkbox" checked="checked" autocomplete="off">
+              </td>
+            </tr>
+            <tr>
+              <th class="tt ttright" data-title="More informative variable names that are ay too big at higher Bezier orders">Alt algorithm names</th>
+              <td>
+                <input id="alt_algorithm_names" type="checkbox" checked="checked" autocomplete="off">
+              </td>
+            </tr>
+            <tr>
+              <th class="tt ttright" data-title="When active, redistributes the points such that a new point can be added without changing the curve">Rebalance on Add Point</th>
+              <td>
+                <input id="rebalance_points_on_order_up" type="checkbox" checked="checked" autocomplete="off">
+              </td>
+            </tr>
+            <tr>
+              <th class="tt ttright" data-title="Attempts to minimize the error when removing a point">Rebalance on Sub Point</th>
+              <td>
+                <input id="rebalance_points_on_order_down" type="checkbox" checked="checked" autocomplete="off">
+              </td>
+            </tr>
+            <tr>
+              <th class="tt ttright" data-title="Toggle showing popups like this">Show Tooltpss</th>
+              <td>
+                <input id="show_tooltips" type="checkbox" checked="checked" autocomplete="off">
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <div id="alg_opt_tabbox-mode" class="tabcontent">
+          <div id="modebox">
+            <div class="choice_wrapper">
+              <div class="choice mode_choice" data-value="bezier" id="mode_choice_bezier">Bezier</div>
+              <div class="choice mode_choice" data-value="spline" id="mode_choice_spline">Spline</div>
+              <!-- <div class="choice mode_choice" data-value="matrix_spline" id="mode_choice_matrix_spline">Spline&nbsp;(Marix)</div> -->
+            </div>
+            <div class="clear_both"></di>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="clear_both"></div>
