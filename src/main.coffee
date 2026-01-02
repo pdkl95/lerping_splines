@@ -152,9 +152,9 @@ class LERPingSplines
     @matrix_spline_curve = new MatrixSpline()
     @build_matrix_spline()
 
-    @reset_loop()
-
     @option.mode.change()
+
+    @reset_loop()
 
     @shift = false
 
@@ -237,7 +237,7 @@ class LERPingSplines
     @t = 0
     @t_real = 0
     @t_step = 0.002
-    @set_tslider_position(@tslider.min, false)
+    @set_tslider_position(@tslider.min)
 
   loop_start: ->
     @loop_running = true
@@ -392,13 +392,13 @@ class LERPingSplines
     else
       @start()
 
-  set_tslider_position: (x, update_t = true) ->
+  set_tslider_position: (x) ->
     x = @tslider.min if x < @tslider.min
     x = @tslider.max if x > @tslider.max
 
     @tslider.position = x
     @tslider.handle.style.left = "#{x}px"
-    @set_t_perc( (x - @tslider.min) / @tslider.range ) if update_t
+    @set_t_perc( (x - @tslider.min) / @tslider.range )
 
   on_tslider_bg_click: (event) =>
     cc = @tslider_bg.getBoundingClientRect()

@@ -1,5 +1,5 @@
 (function() {
-  var Bezier, Color, Curve, LERP, LERPingSplines, MatrixSpline, MatrixSplineSegment, Point, Spline, TAU, Vec2, clone,
+  var Bezier, Color, Curve, LERP, LERPingSplines, MatrixSpline, MatrixSplineSegment, Point, Spline, TAU, Vec2,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
@@ -889,7 +889,8 @@
       if (this.expected_points !== this.enabled_points) {
         APP.fatal_error("Wrong number of enabled points! Expected " + this.expected_points + ", have enabled " + this.enabled_points + " (order=" + this.order + " segment_count=" + this.segment_count);
       }
-      return this.mirror_knot_neighbors();
+      this.mirror_knot_neighbors();
+      return this.update();
     };
 
     Spline.prototype.mirror_knot_neighbors = function() {
@@ -1584,8 +1585,8 @@
       this.build_spline();
       this.matrix_spline_curve = new MatrixSpline();
       this.build_matrix_spline();
-      this.reset_loop();
       this.option.mode.change();
+      this.reset_loop();
       this.shift = false;
       this.context.addEventListener('keydown', this.on_keydown);
       this.context.addEventListener('keyup', this.on_keyup);
@@ -1691,7 +1692,7 @@
       this.t = 0;
       this.t_real = 0;
       this.t_step = 0.002;
-      return this.set_tslider_position(this.tslider.min, false);
+      return this.set_tslider_position(this.tslider.min);
     };
 
     LERPingSplines.prototype.loop_start = function() {
@@ -1880,10 +1881,7 @@
       }
     };
 
-    LERPingSplines.prototype.set_tslider_position = function(x, update_t) {
-      if (update_t == null) {
-        update_t = true;
-      }
+    LERPingSplines.prototype.set_tslider_position = function(x) {
       if (x < this.tslider.min) {
         x = this.tslider.min;
       }
@@ -1892,9 +1890,7 @@
       }
       this.tslider.position = x;
       this.tslider.handle.style.left = x + "px";
-      if (update_t) {
-        return this.set_t_perc((x - this.tslider.min) / this.tslider.range);
-      }
+      return this.set_t_perc((x - this.tslider.min) / this.tslider.range);
     };
 
     LERPingSplines.prototype.on_tslider_bg_click = function(event) {
@@ -2236,37 +2232,6 @@
       return window.APP.draw();
     };
   })(this));
-
-  clone = function(obj) {
-    var flags, key, newInstance;
-    if ((obj == null) || typeof obj !== 'object') {
-      return obj;
-    }
-    if (obj instanceof Date) {
-      return new Date(obj.getTime());
-    }
-    if (obj instanceof RegExp) {
-      flags = '';
-      if (obj.global != null) {
-        flags += 'g';
-      }
-      if (obj.ignoreCase != null) {
-        flags += 'i';
-      }
-      if (obj.multiline != null) {
-        flags += 'm';
-      }
-      if (obj.sticky != null) {
-        flags += 'y';
-      }
-      return new RegExp(obj.source, flags);
-    }
-    newInstance = new obj.constructor();
-    for (key in obj) {
-      newInstance[key] = clone(obj[key]);
-    }
-    return newInstance;
-  };
 
   Vec2 = (function() {
     function Vec2() {}

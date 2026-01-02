@@ -675,6 +675,7 @@ class Spline extends Curve
       APP.fatal_error("Wrong number of enabled points! Expected #{@expected_points}, have enabled #{@enabled_points} (order=#{@order} segment_count=#{@segment_count}")
 
     @mirror_knot_neighbors()
+    @update()
 
   mirror_knot_neighbors: ->
     for p from @each_knot()
