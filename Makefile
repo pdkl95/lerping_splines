@@ -1,14 +1,9 @@
-top_srcdir ?= .
-srcdir     ?= $(top_srcdir)
-builddir   ?= $(top_srcdir)
-
 #
 # config
 #
 
 PROJECT = lerping_splines
 
-COFFEE_EXTRA_OPTS = --inline-map
 COFFEE ?= coffee --no-header --compile
 RM ?= rm -f
 
@@ -34,10 +29,13 @@ TARGETS = $(JS_TARGETS)
 all: build
 build: $(TARGETS)
 
+debug: COFFEE += --inline-map
+debug: $(TARGETS)
+
 $(PROJECT).js: $(PROJECT_COFFEE_SRC)
-	cat $^ | $(COFFEE) $(COFFEE_EXTRA_OPTS) --stdio > $@
+	cat $^ | $(COFFEE)  --stdio > $@
 
 clean:
 	$(RM) $(TARGETS)
 
-.PHONY: all build clean
+.PHONY: all build debug clean
