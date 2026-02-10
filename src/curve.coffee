@@ -226,6 +226,7 @@ class Curve
       null
 
   draw_pen: ->
+    @pen = @find_pen()
     normal = @get_normal()
     return unless normal?
     if normal?
