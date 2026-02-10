@@ -390,6 +390,7 @@
 
     Curve.prototype.draw_pen = function() {
       var angle, arrow, arrow_shaft, arrow_side1, arrow_side2, arrowtip, ctx, normal, plabel_offset, plx, ply;
+      this.pen = this.find_pen();
       normal = this.get_normal();
       if (normal == null) {
         return;
