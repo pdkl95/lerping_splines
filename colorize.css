@@ -1,0 +1,10 @@
+.colorize { color: #d0d0d0; background-color: #0e0e0e; padding: 3px; }
+.colorize .line { font-family: '"Ubuntu Mono",Inconsolata,Consolas,monospace'; font-size: 14px; padding: 0; margin: 0; background-color: #0e0e0e; }
+.colorize .linetext { padding-left: 0.5em; }
+.colorize .tok_k, .colorize .tok_kd { color: #6ab825; font-weight: bold; }
+.colorize .tok_o, .colorize .tok_p { color: #d0d0d0; }
+.colorize .tok_o { font-weight: bold; }
+.colorize .tok_nx { /* color: #62c2f1 */ /* color: #e9bbac */ color: #e88f89; }
+.colorize .tok_mf { color: #62c2ff; background-color: #0c233a; font-weight: bold; }
+.colorize .tok_xa, .colorize .tok_xb { color: #92b6f4; }
+.colorize .tok_xt { color: #eb9366; font-weight: bold; }
