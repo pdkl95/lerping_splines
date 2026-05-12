@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <title>LERPing Splines</title>
     <link rel="stylesheet" type="text/css" media="screen" href="basic.css">
+    <link rel="stylesheet" type="text/css" media="screen" href="colorize.css">
     <link rel="stylesheet" type="text/css" media="screen" href="style.css" title="app_stylesheet">
   </head>
   <body id="body">
@@ -66,10 +67,9 @@
         <div id="alg_opt_tabbox-algorithm" class="tabcontent">
           <div id="algorithmbox">
             <h4>Lerp: Linear Intrpolaton</h4>
-            <pre>function Lerp(vector1, vector2, t) {
-              return ((1-t) * vector1) +
-              (   t  * vector2)
-              }</pre>
+            <pre class="colorize"><span class='linetext'><span class="tok_kd">function</span> <span class="tok_nx">Lerp</span><span class="tok_p">(</span><span class="tok_xa">vectorA</span><span class="tok_p">,</span> <span class="tok_xb">vectorB</span><span class="tok_p">,</span> <span class="tok_xt">t</span><span class="tok_p">)</span> <span class="tok_p">{</span></span>
+<span class='linetext'>  <span class="tok_k">return</span> <span class="tok_p">((</span><span class="tok_mf">1.0</span> <span class="tok_o">-</span> <span class="tok_xt">t</span><span class="tok_p">)</span> <span class="tok_o">*</span> <span class="tok_xa">vectorA</span><span class="tok_p">)</span> <span class="tok_o">+</span> <span class="tok_p">(</span><span class="tok_xt">t</span> <span class="tok_o">*</span> <span class="tok_xb">vectorB</span><span class="tok_p">);</span></span>
+<span class='linetext'><span class="tok_p">}</span></span></pre>
             <h4>It's Lerp All The Way Down</h4>
             <pre id="algorithm_text"></pre>
           </div>
