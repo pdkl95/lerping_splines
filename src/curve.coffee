@@ -501,6 +501,9 @@ class Bezier extends Curve
 
     lines.join("\n")
 
+class BezierForSpline extends Curve
+  @min_points: 3
+
 class Spline extends Curve
   @min_order: 1
   @max_order: 3

@@ -1,5 +1,5 @@
 (function() {
-  var Bezier, Color, Curve, LERP, LERPingSplines, MatrixSpline, MatrixSplineSegment, Point, Spline, TAU, Vec2,
+  var Bezier, BezierForSpline, Color, Curve, LERP, LERPingSplines, MatrixSpline, MatrixSplineSegment, Point, Spline, TAU, Vec2,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
@@ -685,6 +685,19 @@
     };
 
     return Bezier;
+
+  })(Curve);
+
+  BezierForSpline = (function(superClass) {
+    extend(BezierForSpline, superClass);
+
+    function BezierForSpline() {
+      return BezierForSpline.__super__.constructor.apply(this, arguments);
+    }
+
+    BezierForSpline.min_points = 3;
+
+    return BezierForSpline;
 
   })(Curve);
 
