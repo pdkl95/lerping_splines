@@ -1,5 +1,5 @@
 (function() {
-  var Bezier, BezierForSpline, Color, Curve, LERP, LERPingSplines, MatrixSpline, MatrixSplineSegment, Point, Spline, TAU, Vec2,
+  var Bezier, Color, Curve, LERP, LERPingSplines, MatrixSpline, MatrixSplineSegment, Point, Spline, TAU, Vec2,
     bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
     extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     hasProp = {}.hasOwnProperty,
@@ -493,7 +493,7 @@
   Bezier = (function(superClass) {
     extend(Bezier, superClass);
 
-    Bezier.min_points = 3;
+    Bezier.min_points = 2;
 
     Bezier.max_points = 8;
 
@@ -685,19 +685,6 @@
     };
 
     return Bezier;
-
-  })(Curve);
-
-  BezierForSpline = (function(superClass) {
-    extend(BezierForSpline, superClass);
-
-    function BezierForSpline() {
-      return BezierForSpline.__super__.constructor.apply(this, arguments);
-    }
-
-    BezierForSpline.min_points = 3;
-
-    return BezierForSpline;
 
   })(Curve);
 
@@ -1919,6 +1906,9 @@
     };
 
     LERPingSplines.prototype.on_tslide_btn_min_click = function() {
+      if (this.spline_mode) {
+        this.curve.set_t_segment(0);
+      }
       this.set_tslider_position(this.tslider.min);
       return this.update_and_draw();
     };

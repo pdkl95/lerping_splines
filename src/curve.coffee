@@ -324,7 +324,7 @@ class Curve
 
 
 class Bezier extends Curve
-  @min_points: 3
+  @min_points: 2
   @max_points: 8
 
   @initial_points: [
@@ -500,9 +500,6 @@ class Bezier extends Curve
             lines.push "#{label} = <#{parseInt(p.position.x, 10)}, #{parseInt(p.position.y, 10)}>"
 
     lines.join("\n")
-
-class BezierForSpline extends Curve
-  @min_points: 3
 
 class Spline extends Curve
   @min_order: 1

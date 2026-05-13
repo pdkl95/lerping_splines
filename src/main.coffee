@@ -410,6 +410,8 @@ class LERPingSplines
     @update_and_draw()
 
   on_tslide_btn_min_click: =>
+    if @spline_mode
+      @curve.set_t_segment(0)
     @set_tslider_position(@tslider.min)
     @update_and_draw()
 
