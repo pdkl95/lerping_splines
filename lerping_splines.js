@@ -493,7 +493,7 @@
   Bezier = (function(superClass) {
     extend(Bezier, superClass);
 
-    Bezier.min_points = 3;
+    Bezier.min_points = 2;
 
     Bezier.max_points = 8;
 
@@ -1906,6 +1906,9 @@
     };
 
     LERPingSplines.prototype.on_tslide_btn_min_click = function() {
+      if (this.spline_mode) {
+        this.curve.set_t_segment(0);
+      }
       this.set_tslider_position(this.tslider.min);
       return this.update_and_draw();
     };

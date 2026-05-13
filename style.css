@@ -62,7 +62,25 @@ h1 {
   padding: 4px;
 }
 
-#content > .graph.panel {
+#content {
+  margin-bottom: 15rem;
+}
+
+#content > footer > a {
+  display: block;
+  margin-top: 1rem;
+  width: fit-content;
+  padding: 0.666rem;
+  border-radius: 12px;
+  border: 1px outset #777;
+  background-color: #dddddd;
+  font-size: large;
+  color: #000;
+}
+#content > footer > a:hover {
+  border: 1px solid #000;
+  color: revert;
+  border-radius: 6px;
 }
 
 .graph_canvas {
@@ -545,8 +563,8 @@ button[disabled] {
   background-color: #BDEDB5;
   border-color: #5FEB47;
   border-style: inset;
-  top: 1px;
-  left: 1px;
+  /* top: 1px; */
+  /* left: 1px; */
 }
 
 .choice_wrapper .choice.selected:hover {
